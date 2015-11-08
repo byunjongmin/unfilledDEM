@@ -26,7 +26,7 @@ function [m2SDSNbrY,m2SDSNbrX,mFlowDir_SubFldReg,mFlowDir_Saddle ...
 % @retval subFldRegTree
 % @retval fldRegInfo
 %
-% @version 0.1.2 / 2015-11-08
+% @version 0.1.3 / 2015-11-08
 % @author Jongmin Byun
 %==========================================================================
 
@@ -258,25 +258,31 @@ for i = 1:nFldReg
                                 
                             end
                         end % if parentID -= 0
-                    end % for t2 = l:nAdjSubFldReg
-                    
-                    if (sharedOutlet(upStreamY,upStreamX) == true ...
-                            && initUpStreamY == upStreamY && initUpStreamX == upStreamX) ...
+                    end % for t1 = tmpindices
+                end % for t2 = 1:nAdjSubFldReg
+                
+                if sharedOutlet(upStreamY,upStreamX) == true ...
+                            && (initUpStreamY == upStreamY && initUpStreamX == upStreamX) ...
                             && nAdjSubFldReg == 0
+                        
                         [subFldRegTree,childrenID] ...
                             = subFldRegTree.addnode(ithFldRegTreeID,goneSubFldRegID(nHead));
                         
-                    end
+                end
+
+                % relocate the position for head
+                nHead = nHead + 1;
+                if nHead > numel(goneSubFldRegID)
                     
-                    % relocate the position for head
-                    nHead = nHead + 1;
-                    if nHead > numel(goneSubFldRegID)
-                        pathNotDone = false;
-                    else
-                        prevSubFldRegID = goneSubFldRegID(nHead);
-                    end
-                end 
-            end
-        end
-    end
-end
+                    pathNotDone = false;
+                    
+                else
+                    
+                    prevSubFldRegID = goneSubFldRegID(nHead);
+                    
+                end
+                
+            end % while pathNotDone
+        end % nSubFldRegInIthFldReg == 1
+    end % for t4 = 1:nToGoSubFldRegID
+end % for i = 1
