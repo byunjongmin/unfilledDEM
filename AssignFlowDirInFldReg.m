@@ -156,10 +156,10 @@ for i = 1:nFldReg
                     tIdx = find(subFldRegOutInfo(t1,2:3) ...
                                 == goneSubFldRegID(nHead));
                     if numel(tIdx) > 0
-                        if tIdx == 2 % 3rd column in subFldRegOutInfo
-                            tAdjSubFldRegID = subFldRegOutInfo(t1,2);
-                        else % tIdx == 1, 2nd column in subFldRegOutInfo
+                        if tIdx == 1 % 2nd column in subFldRegOutInfo
                             tAdjSubFldRegID = subFldRegOutInfo(t1,3);
+                        elseif tIdx == 2 % 3rd column in subFldRegOutInfo
+                            tAdjSubFldRegID = subFldRegOutInfo(t1,2);
                         end
                         
                         % remove repeated one except for the shared outlet

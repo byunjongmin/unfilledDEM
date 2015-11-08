@@ -186,7 +186,7 @@ while pathNotDone
                 end
             end    
         end
-   end
+    end
         
     % if targetSubFldRegID is nan, upstream cell would be the outlet of
     % flooded region. therefore define the targetSubFldReg using the sub
