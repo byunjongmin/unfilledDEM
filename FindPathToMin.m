@@ -38,7 +38,7 @@ function [m2SDSNbrY,m2SDSNbrX,arrivedRegMinY,arrivedRegMinX ...
 % @retval mFlowDir_SubFldReg
 % @retval mFlowDir_Saddle
 %
-% @version 0.1.1. / 2015-11-05
+% @version 0.1.2. / 2015-11-08
 % @author Jongmin Byun
 %==========================================================================
 
@@ -76,8 +76,7 @@ while pathNotDone
                && (1 < ithNbrX && ithNbrX < X+2)
            
             % if the init upstream cell is not a shared outelt
-            if sharedOutlet(initUpStreamY,initUpStreamX) == 0 ...
-                    && fldRegID(initUpStreamY,initUpStreamX) < 0
+            if sharedOutlet(initUpStreamY,initUpStreamX) == false
                 
                 % check if ith neighbor is within the ith flooded region
                 if fldRegID(ithNbrY,ithNbrX) == ithFldRegID
@@ -121,7 +120,7 @@ while pathNotDone
                     end
                 end
                 
-            elseif sharedOutlet(initUpStreamY,initUpStreamX) == false ...
+            elseif sharedOutlet(initUpStreamY,initUpStreamX) == true ...
                     && fldRegID(initUpStreamY,initUpStreamX) < 0
                    
                 if isnan(targetSubFldRegID)
