@@ -21,7 +21,7 @@ function [flood,m1SDSNbrY,m1SDSNbrX,m2SDSNbrY,m2SDSNbrX,fldRegID,nFldRegCells ..
 % @retval subFldRegOutInfo: information on sub-flooded region outlets
 % @retval sharedOutlet: number of shared depressions for an shared outlet
 %
-% @version: 2.1.5 / 2015-11-05
+% @version: 2.1.6 / 2015-11-09
 % @authoer: Jongmin Byun
 %==========================================================================
 
@@ -38,7 +38,7 @@ ithNbrYOffset = [0 -1 -1 -1  0  1  1  1];
 ithNbrXOffset = [1  1  0 -1 -1 -1  0  1];
 VERY_HIGH = inf;
 UNFLOODED = 0; CURRENT_FLOODED = 1; OLD_FLOODED = 2; SINK = 3;
-% Note that OLD_FLOODED don't recognize the mergedSubFldRegID.
+% Note that OLD_FLOODED don't recognize the goneSubFldRegID.
 OUTLET_AT_BOUNDARY = 1; NEW_OUTLET = 4;
 
 OUTLET_DRY_NBR = 1; % outlet to dry neighbor
@@ -128,14 +128,19 @@ for ithSink = 1:allSinksNo
                     
                     if DEM(nbrY,nbrX) <= lowerElev
                         % outlet candidate
-                        outletCandY = nbrY; outletCandX = nbrX;
+                        outletCandY = nbrY;
+                        outletCandX = nbrX;
                         lowerElev = DEM(nbrY,nbrX);
+                        % record for the cell immediately before the outlet
+                        % candidate
+                        beforeOutletCandY = crtCellY;
+                        beforeOutletCandX = crtCellX;
                     end
                 
                 % if the neighbor is in the OLDFLOODED,
                 elseif flood(nbrY,nbrX) == OLD_FLOODED
                     
-                    % if the neighbor is included in the mergedSubFldRegID,
+                    % if the neighbor is included in the mergedGoneSubFldRegID,
                     % it is not the outlet candidate
                     if ismember(subFldRegID(nbrY,nbrX),mergedGoneSubFldRegID)
                         
@@ -153,15 +158,20 @@ for ithSink = 1:allSinksNo
                         
                         if DEM(nbrY,nbrX) <= lowerElev
                             % outlet candidate
-                            outletCandY = nbrY; outletCandX = nbrX;
+                            outletCandY = nbrY;
+                            outletCandX = nbrX;
                             lowerElev = DEM(nbrY,nbrX);
+                            % record for the cell immediately before the outlet
+                            % candidate
+                            beforeOutletCandY = crtCellY;
+                            beforeOutletCandX = crtCellX;
                         end
                         
                     end  
                 % elseif flood(nbrY,nbrX) == CURRENT_FLOODED
                     % skip!
                 end
-            end
+            end % for ithNbr = 1:8
             ithCell = ithCell + 1;     
         end
         
@@ -187,6 +197,7 @@ for ithSink = 1:allSinksNo
             SHARED_OUTLET_SURROUNDED_HIGH_ELEV_tf = false; % shared outlet surrouned by the cells with higher elevation
             SHARED_OUTLET_WET_NBR_idx = 0; % shared outlet to wet neighbor
             
+            % if the candiate is not outlet,
             if fldRegID(outletCandY,outletCandX) >= 0
                 
                 % searching for the neighbor enabling to drain
@@ -249,7 +260,7 @@ for ithSink = 1:allSinksNo
                     end
                 end
                     
-                
+            % if the candidate is an outlet 
             else % fldRegID(outletCandY,outletCandX) < 0
 
                 steeperSlope = 0;
@@ -371,7 +382,7 @@ for ithSink = 1:allSinksNo
                     for i=1:nSharedSubFldReg
                         subFldRegOutInfo = [subFldRegOutInfo ...
                             ;ithFldReg ...
-                            ,subFldRegID(crtCellY,crtCellX) ... % current sub-flooded region ID
+                            ,subFldRegID(beforeOutletCandY,beforeOutletCandX) ... % adjacent sub-flooded region ID
                             ,sharedSubFldRegID(i) ... % shared sub-flooded region ID
                             ,outletCandY,outletCandX];
 
@@ -397,7 +408,7 @@ for ithSink = 1:allSinksNo
                 % Common task for false outlet
                 % a. mark sub-flooded region ID
                 % b. make sub-flooded region outlet info
-                % c. update mergedSubFldRegID
+                % c. update mergedGoneSubFldRegID
                 % d. add the outlet candidate to the list of the current
                 %   flooded region
 
@@ -425,7 +436,7 @@ for ithSink = 1:allSinksNo
                         % b. make sub-flooded region info
                         subFldRegOutInfo = [subFldRegOutInfo ...
                             ;ithFldReg ...
-                            ,subFldRegID(crtCellY,crtCellX) ... % current sub-flooded region ID
+                            ,subFldRegID(beforeOutletCandY,beforeOutletCandX) ... % adjacent sub-flooded region ID
                             ,sharedSubFldRegID(i) ... % shared sub-flooded region ID
                             ,outletCandY,outletCandX];
                         
