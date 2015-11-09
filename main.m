@@ -123,11 +123,11 @@ load(dataFilePath);
     = ProcessSink(DEM,targetDrainage,slopeAllNbr ...
         ,SDSNbrY,SDSNbrX,SDSFlowDirection);
     
-% %% For debug
-% INPUT_DIR = '../data/input';
-% dataFileName = 'a_PSink_2015-09-13.mat';
-% dataFilePath = fullfile(INPUT_DIR,dataFileName);
-% load(dataFilePath);
+% For debug
+INPUT_DIR = '../data/input';
+dataFileName = 'a_PSink_2015-11-09.mat';
+dataFilePath = fullfile(INPUT_DIR,dataFileName);
+load(dataFilePath);
     
 % frequency distribution of the types of sub-flooded region's outlet
 figure(2); clf;
@@ -138,39 +138,33 @@ ylabel('Frequency');
 grid on
 
 % set boundary
-fXMin = 150; fXMax = 200;
-fYMin = 150; fYMax = 200;
+fXMin = 301; fXMax = 325;
+fYMin = 828; fYMax = 868;
 figure(3)
 
 subplot(2,2,1)
-imagesc(DEM(fXMin:fXMax,fYMin:fYMax));
+imagesc(DEM(fYMin:fYMax,fXMin:fXMax));
 colorbar;
 set(gca,'DataAspectRatio',[1 1 1]);
 title('Flooded Region ID');
 
 subplot(2,2,2)
-imagesc(fldRegID(fXMin:fXMax,fYMin:fYMax));
+imagesc(fldRegID(fYMin:fYMax,fXMin:fXMax));
 colorbar;
 set(gca,'DataAspectRatio',[1 1 1]);
 title('Flooded Region ID');
 
 subplot(2,2,3)
-imagesc(subFldRegID(fXMin:fXMax,fYMin:fYMax));
+imagesc(subFldRegID(fYMin:fYMax,fXMin:fXMax));
 colorbar;
 set(gca,'DataAspectRatio',[1 1 1]);
 title('Sub-flooded Region ID');
 
 subplot(2,2,4)
-imagesc(subFldRegOutlet(fXMin:fXMax,fYMin:fYMax));
+imagesc(subFldRegOutlet(fYMin:fYMax,fXMin:fXMax));
 colorbar;
 set(gca,'DataAspectRatio',[1 1 1]);
 title('Sub-flooded Region Outlet');
-
-%% For debug
-INPUT_DIR = '../data/input';
-dataFileName = 'a_PSink_2015-11-05.mat';
-dataFilePath = fullfile(INPUT_DIR,dataFileName);
-load(dataFilePath);
 
 %% Modify flow direction of the cells within each depression
 
