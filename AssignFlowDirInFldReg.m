@@ -1,5 +1,5 @@
 function [m2SDSNbrY,m2SDSNbrX,mFlowDir_SubFldReg,mFlowDir_Saddle ...
-    ,subFldRegTree,fldRegInfo] ...
+    ,root,fldRegInfo] ...
     = AssignFlowDirInFldReg(m2SDSNbrY,m2SDSNbrX,subFldRegOutInfo,DEM ...
     ,slopeAllNbr,regionalMin,fldRegID,subFldRegID,sharedOutlet)
 % @file AssignFlowDirInFldReg.m
@@ -23,10 +23,10 @@ function [m2SDSNbrY,m2SDSNbrX,mFlowDir_SubFldReg,mFlowDir_Saddle ...
 % @retval m2SDSNbrX
 % @retval flatRegMap
 % @retval mFlowDir_SubFldReg
-% @retval subFldRegTree
+% @retval root: tree database of sub-flooded regions
 % @retval fldRegInfo
 %
-% @version 0.1.3 / 2015-11-08
+% @version 0.1.4 / 2015-11-10
 % @author Jongmin Byun
 %==========================================================================
 
@@ -34,7 +34,7 @@ function [m2SDSNbrY,m2SDSNbrX,mFlowDir_SubFldReg,mFlowDir_Saddle ...
 [mRows,nCols] = size(DEM);
 
 % variables
-subFldRegTree = tree('Root Node'); % init the tree db of sub-flooded regions
+root = tree('Root Node'); % init the tree db of sub-flooded regions
 mFlowDir_SubFldReg = nan(mRows,nCols); % flow direction modified cell within a sub-flooded region
 mFlowDir_Saddle = zeros(mRows,nCols); % flow direction modified cell on a saddle
 
@@ -82,35 +82,35 @@ for i = 1:nFldReg
         = fldRegInfo(i,3);
     
     % init the tree of sub-flooded region in the ith flooded region
-    [subFldRegTree,ithFldRegTreeID] = subFldRegTree.addnode(1,ithFldRegID);
+    [root,ithFldRegTreeID] = root.addnode(1,ithFldRegID);
 
     % find a path from the outlet to the first met regional minima
     [upStreamY,upStreamX] ... % initial upstream index
-        = ind2sub([mRows,nCols],fldRegInfo(i,2));
+        = ind2sub([mRows,nCols],ithFldRegOutIdx);
         
-    initUpStreamY = upStreamY;
-    initUpStreamX = upStreamX;
+    ithFldRegOutY = upStreamY;
+    ithFldRegOutX = upStreamX;
     
+    % for a shared true outlet
     nToGoSubFldRegID = sharedOutlet(upStreamY,upStreamX) + 1;
     toGoSubFldRegID = [];
-    goneConSubFldReg = []; % gone outlet connected sub-flooded region
+    goneConnectedSubFldReg = []; % gone outlet connected sub-flooded region
     
-    for t4 = 1:nToGoSubFldRegID
+    for j = 1:nToGoSubFldRegID
         
-        % if shared outlet, reset initUpStreamY, X to revisit
-        % ithFldRegOutIdx
-        if sharedOutlet(initUpStreamY,initUpStreamX)
-            upStreamY = initUpStreamY;
-            upStreamX = initUpStreamX;
+        % if shared outlet, reset upStreamY, X to revisit ithFldRegOutIdx
+        if sharedOutlet(ithFldRegOutY,ithFldRegOutX) == true
+            upStreamY = ithFldRegOutY;
+            upStreamX = ithFldRegOutX;
         end
         
         % set the variable for determining a target flooded region as NULL
         arrivedRegMinY = 0; % regional minima at which a path will be ended
         arrivedRegMinX = 0;
-        if t4 == 1
+        if j == 1
             targetSubFldRegID = nan(1,1); % target sub-flooded region ID
         else
-            targetSubFldRegID = toGoSubFldRegID(t4);
+            targetSubFldRegID = toGoSubFldRegID(j);
         end
         prevSubFldRegID = nan(1,1); % previously gone sub-flooded region ID
         
@@ -120,29 +120,31 @@ for i = 1:nFldReg
             ,m2SDSNbrY,m2SDSNbrX,regionalMin,fldRegID,subFldRegID ...
             ,arrivedRegMinY,arrivedRegMinX,ithFldRegID,targetSubFldRegID ...
             ,prevSubFldRegID,mFlowDir_SubFldReg,mFlowDir_Saddle ...
-            ,ithFldRegOutIdx,sharedOutlet,goneConSubFldReg);
+            ,ithFldRegOutIdx,sharedOutlet,goneConnectedSubFldReg);
         
         arrivedSubFldRegID = subFldRegID(arrivedRegMinY,arrivedRegMinX);
-        prevSubFldRegID ... % define previous sub-flooded region ID
+        prevSubFldRegID ... % define previously gone sub-flooded region ID
             = arrivedSubFldRegID;
-        goneConSubFldReg = [goneConSubFldReg; arrivedSubFldRegID];
-        if t4 == 1
-            toGoSubFldRegID = prevSubFldRegID;
+        goneConnectedSubFldReg = [goneConnectedSubFldReg; arrivedSubFldRegID];
+        if j == 1
+            % if first visit, fill toGoSubFldRegID
+            toGoSubFldRegID = arrivedSubFldRegID;
         end
 
         % check if there is no adjacent sub flooded region in ith flooded region
         if nSubFldRegInIthFldReg == 1
             % if no, end the loop
-            [subFldRegTree,childrenID] ...
-                = subFldRegTree.addnode(ithFldRegTreeID,prevSubFldRegID);
+            [root,childrenID] ...
+                = root.addnode(ithFldRegTreeID,arrivedSubFldRegID);
         else
             % if there is, identify adjacent sub-flooded regions and find paths
             % from each outlet to another regional minima
-            nHead = 1; % reset the number for indicating parent one
-            nSubHead = 1; % reset the number for indicating child one
-            goneSubFldRegID = toGoSubFldRegID(t4); % gone sub-flooded region ID
+            nHead = 1; % reset the number for indicating a parent one
+            nSubHead = 1; % reset the number for indicating a child one
+            goneSubFldRegID = toGoSubFldRegID(j); % gone sub-flooded region ID
             sortedSubFldRegOutYX = []; % outlets of sub-flooded regions
             
+            % identify adjacent sub-flooded regions
             nSubFldRegOut = numel(subFldRegOutInfo(:,1));
             isOutletConnectedSubFldReg = true;
             pathNotDone = true;
@@ -151,21 +153,21 @@ for i = 1:nFldReg
                 % identify adjacent sub-flooded regions using sub-flooded
                 % region outlet information
                 nAdjSubFldReg = 0; % number of adjacent sub-flooded regions
-                for t1 = 1:nSubFldRegOut
+                for k = 1:nSubFldRegOut
                     
-                    tIdx = find(subFldRegOutInfo(t1,2:3) ...
+                    tIdx = find(subFldRegOutInfo(k,2:3) ...
                                 == goneSubFldRegID(nHead));
                     if numel(tIdx) > 0
                         if tIdx == 1 % 2nd column in subFldRegOutInfo
-                            tAdjSubFldRegID = subFldRegOutInfo(t1,3);
+                            tAdjSubFldRegID = subFldRegOutInfo(k,3);
                         elseif tIdx == 2 % 3rd column in subFldRegOutInfo
-                            tAdjSubFldRegID = subFldRegOutInfo(t1,2);
+                            tAdjSubFldRegID = subFldRegOutInfo(k,2);
                         end
                         
                         % remove repeated one except for the shared outlet
-                        outletY = subFldRegOutInfo(t1,4);
-                        outletX = subFldRegOutInfo(t1,5);
-                        if sharedOutlet(initUpStreamY,initUpStreamX) == false
+                        outletY = subFldRegOutInfo(k,4);
+                        outletX = subFldRegOutInfo(k,5);
+                        if sharedOutlet(ithFldRegOutIdx) == false
                             
                             if ~ismember(tAdjSubFldRegID,goneSubFldRegID) ...
                                     && tAdjSubFldRegID ~= 0
@@ -173,24 +175,26 @@ for i = 1:nFldReg
                                 goneSubFldRegID = [goneSubFldRegID;tAdjSubFldRegID];
                                 nAdjSubFldReg = nAdjSubFldReg + 1;
                                 sortedSubFldRegOutYX = [sortedSubFldRegOutYX ...
-                                    ;subFldRegOutInfo(t1,4),subFldRegOutInfo(t1,5)];
+                                    ;subFldRegOutInfo(k,4),subFldRegOutInfo(k,5)];
                                 
                             end
                         
-                        elseif sharedOutlet(initUpStreamY,initUpStreamX) == true ...
-                                && (outletY == initUpStreamY && outletX == initUpStreamX)
+                        else % sharedOutlet(ithFldRegOutIdx) == true
+                                
+                            if (outletY == ithFldRegOutY && outletX == ithFldRegOutX)
                             
-                            if ~ismember(tAdjSubFldRegID,toGoSubFldRegID) ...
-                                    && tAdjSubFldRegID ~= 0
-                                toGoSubFldRegID = [toGoSubFldRegID;tAdjSubFldRegID];
+                                if ~ismember(tAdjSubFldRegID,toGoSubFldRegID) ...
+                                        && tAdjSubFldRegID ~= 0
+                                    toGoSubFldRegID = [toGoSubFldRegID;tAdjSubFldRegID];
+                                end
                             end
-
-                        end
-                    end
-                end
+                            
+                        end % if sharedOutlet(ithFldRegOutIdx) 
+                    end % if numel(tIdx)
+                end % for k = 1:
                 
                 % assign flow direction on each adjacent sub-flooded region
-                for t2 = 1:nAdjSubFldReg
+                for l = 1:nAdjSubFldReg
                     
                     % coordinate for the outlet of sub-flooded region
                     upStreamY = sortedSubFldRegOutYX(nSubHead,1);
@@ -209,7 +213,7 @@ for i = 1:nFldReg
                         ,m2SDSNbrY,m2SDSNbrX,regionalMin,fldRegID,subFldRegID ...
                         ,arrivedRegMinY,arrivedRegMinX,ithFldRegID,targetSubFldRegID ...
                         ,prevSubFldRegID,mFlowDir_SubFldReg,mFlowDir_Saddle ...
-                        ,ithFldRegOutIdx,sharedOutlet,goneConSubFldReg);
+                        ,ithFldRegOutIdx,sharedOutlet,goneConnectedSubFldReg);
                 
                     arrivedSubFldRegID = subFldRegID(arrivedRegMinY,arrivedRegMinX);
     
@@ -218,55 +222,57 @@ for i = 1:nFldReg
                     
                     % find a parent tree ID
                     parentID = 0;
-                    tmpindices = depthfirstiterator(subFldRegTree,ithFldRegTreeID);
+                    tmpindices = depthfirstiterator(root,ithFldRegTreeID);
                     tmpindices(1) = [];
-                    for t1 = tmpindices
-                        tmpSubFldRegID = subFldRegTree.get(t1);
+                    for m = tmpindices
+                        tmpSubFldRegID = root.get(m);
                         if tmpSubFldRegID == prevSubFldRegID
-                            parentID = t1;
+                            parentID = m;
                         end
-                        % check if parent node is the outlet of the ith
-                        % flooded region
-                        if parentID ~= 0 % parent is not the outlet!
-                            
-                            [subFldRegTree,childrenID] ...
-                                = subFldRegTree.addnode(parentID,arrivedSubFldRegID);
-                            
-                        else % parentID == 0: parent is the outlet!
-                            
-                            % check if the ouelet is an shared outlet
-                            if sharedOutlet(upStreamY,upStreamX) == false
-                            
-                                % record also the first met sub-flooded region
-                                [subFldRegTree,childrenID] ...
-                                    = subFldRegTree.addnode(ithFldRegTreeID,prevSubFldRegID);
-                                [subFldRegTree,grandChildrenID] ...
-                                    = subFldRegTree.addnode(childrenID,arrivedSubFldRegID);
-                                
-                            elseif sharedOutlet(upStreamY,upStreamX) == true ...
-                                    && (initUpStreamY == upStreamY && initUpStreamX == upStreamX)
-                                
-                                % shared outlet!
-                                if isOutletConnectedSubFldReg == true
-                                    [subFldRegTree,childrenID] ...
-                                        = subFldRegTree.addnode(ithFldRegTreeID,goneSubFldRegID(nHead));
-                                    isOutletConnectedSubFldReg = false;
-                                end
-                                
-                                [subFldRegTree,childrenID] ...
-                                    = subFldRegTree.addnode(ithFldRegTreeID,arrivedSubFldRegID);
-                                
+                    end
+                    
+                    % check if parent node is the outlet of the ith
+                    % flooded region
+                    if parentID ~= 0 % parent is not the outlet!
+
+                        [root,childrenID] ...
+                            = root.addnode(parentID,arrivedSubFldRegID);
+
+                    else % parentID == 0: parent is the outlet!
+
+                        % check if the ouelet is an shared outlet
+                        if sharedOutlet(upStreamY,upStreamX) == false
+
+                            % record also the first met sub-flooded region
+                            [root,childrenID] ...
+                                = root.addnode(ithFldRegTreeID,prevSubFldRegID);
+                            [root,grandChildrenID] ...
+                                = root.addnode(childrenID,arrivedSubFldRegID);
+
+                        elseif sharedOutlet(upStreamY,upStreamX) == true ...
+                                && (ithFldRegOutY == upStreamY && ithFldRegOutX == upStreamX)
+
+                            % shared outlet!
+                            if isOutletConnectedSubFldReg == true
+                                [root,childrenID] ...
+                                    = root.addnode(ithFldRegTreeID,goneSubFldRegID(nHead));
+                                isOutletConnectedSubFldReg = false;
                             end
-                        end % if parentID -= 0
-                    end % for t1 = tmpindices
-                end % for t2 = 1:nAdjSubFldReg
+
+                            [root,childrenID] ...
+                                = root.addnode(ithFldRegTreeID,arrivedSubFldRegID);
+
+                        end
+                    end % if parentID -= 0
+
+                end % for l = 1:nAdjSubFldReg
                 
                 if sharedOutlet(upStreamY,upStreamX) == true ...
-                            && (initUpStreamY == upStreamY && initUpStreamX == upStreamX) ...
+                            && (ithFldRegOutY == upStreamY && ithFldRegOutX == upStreamX) ...
                             && nAdjSubFldReg == 0
                         
-                        [subFldRegTree,childrenID] ...
-                            = subFldRegTree.addnode(ithFldRegTreeID,goneSubFldRegID(nHead));
+                        [root,childrenID] ...
+                            = root.addnode(ithFldRegTreeID,goneSubFldRegID(nHead));
                         
                 end
 
@@ -283,6 +289,6 @@ for i = 1:nFldReg
                 end
                 
             end % while pathNotDone
-        end % nSubFldRegInIthFldReg == 1
-    end % for t4 = 1:nToGoSubFldRegID
-end % for i = 1
+        end % if nSubFldRegInIthFldReg == 1
+    end % for j = 1:nToGoSubFldRegID
+end % for i = 1:nFldReg
