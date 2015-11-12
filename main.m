@@ -198,7 +198,31 @@ title('Sub-flooded Region Outlet');
     = AssignFlowDirInFldReg(m2SDSNbrY,m2SDSNbrX,subFldRegOutInfo,DEM ...
     ,slopeAllNbr,regionalMin,fldRegID,subFldRegID,sharedOutlet);
 
+% display the tree DB of flooded region
 disp(subFldRegTree.tostring);
+
+% draw a stream longitudinal profile on the interesting stream path
+
+% record stream path using the input initial and end point coordinates
+initY = 3; initX = 12;
+endY = 21; endX = 9;
+[streamPath,distFromInit] = RecordStrPath(initY,initX,endY,endX ...
+    ,mRows,nCols,m2SDSNbrY,m2SDSNbrX,dY,dX);
+
+% stream longitudinal profile using raw DEM
+elev = DEM(streamPath(:));
+
+% draw figure
+figure(4); clf;
+set(gcf, 'Color',[1,1,1]);
+stairs(distFromInit,elev);
+
+% grid on
+title('Longitudinal Stream Profile')
+xlabel('Distance From Divide [m]')
+ylabel('Elevation [m]')
+xlim([0 distFromInit(end)])
+ylim([min(elev),max(elev)])
 
 %% Calculate upstream cells number of all cells within every depression
 
