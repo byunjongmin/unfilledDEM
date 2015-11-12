@@ -26,7 +26,7 @@ function [m2SDSNbrY,m2SDSNbrX,mFlowDir_SubFldReg,mFlowDir_Saddle ...
 % @retval root: tree database of sub-flooded regions
 % @retval fldRegInfo
 %
-% @version 0.2.0 / 2015-11-12
+% @version 0.2.1 / 2015-11-12
 % @author Jongmin Byun
 %==========================================================================
 
@@ -79,7 +79,7 @@ for i = 1:nFldReg
     % collect the info about the ith flooded region
     ithFldRegID = fldRegInfo(i,1); % ith flooded region ID
     ithFldRegOutIdx = fldRegInfo(i,2); % its outlet index
-    [ithFldRegOutY,ithFldRegOutX] = sub2ind([mRows,nCols],ithFldRegOutIdx);
+    [ithFldRegOutY,ithFldRegOutX] = ind2sub([mRows,nCols],ithFldRegOutIdx);
     nSubFldRegInIthFldReg = fldRegInfo(i,3);
     
     % init the tree DB of sub-flooded regions in the ith flooded region
@@ -94,8 +94,8 @@ for i = 1:nFldReg
     prevSubFldRegID = nan; % previously gone sub-flooded region ID
     targetSubFldRegID = nan; % target sub-flooded region ID
 
-    goneSubFldRegID = nan; % record for already gone sub-flooded region ID
-    outConnectedSubFldRegID = nan; % true outlet connected sub-flooded region ID
+    goneSubFldRegID = []; % record for already gone sub-flooded region ID
+    outConnectedSubFldRegID = []; % true outlet connected sub-flooded region ID
     nOutConnectedSubFldReg = sharedOutlet(upStreamY,upStreamX) + 1;
     
     for j = 1:nOutConnectedSubFldReg
@@ -111,9 +111,9 @@ for i = 1:nFldReg
             ,mFlowDir_SubFldReg,mFlowDir_Saddle] ...
             = FindPathToMin(mRows,nCols,upStreamY,upStreamX,slopeAllNbr ...
             ,m2SDSNbrY,m2SDSNbrX,regionalMin,fldRegID,subFldRegID ...
-            ,arrivedRegMinY,arrivedRegMinX,ithFldRegID,targetSubFldRegID ...
+            ,ithFldRegID,targetSubFldRegID ...
             ,prevSubFldRegID,mFlowDir_SubFldReg,mFlowDir_Saddle ...
-            ,ithFldRegOutIdx,sharedOutlet,goneConnectedSubFldReg);
+            ,ithFldRegOutIdx,sharedOutlet,outConnectedSubFldRegID);
 
         % record the arrived sub-flooded region ID at the tree DB
         arrivedSubFldRegID = subFldRegID(arrivedRegMinY,arrivedRegMinX);
@@ -138,10 +138,10 @@ for i = 1:nFldReg
                 
                 % identify adjacent sub-flooded regions
                 adjSubFldRegIdx_2nd = find(subFldRegOutInfo(:,2) ...
-                                        == goneSubFldRegID(idicatorForParent));
+                                        == goneSubFldRegID(indicatorForParent));
                 adjSubFldRegID_2nd = subFldRegOutInfo(adjSubFldRegIdx_2nd,3);
                 adjSubFldRegIdx_3rd = find(subFldRegOutInfo(:,3)  ...
-                                        == goneSubFldRegID(idicatorForParent));
+                                        == goneSubFldRegID(indicatorForParent));
                 adjSubFldRegID_3rd = subFldRegOutInfo(adjSubFldRegIdx_3rd,2);
                 
                 adjSubFldRegIdx = [adjSubFldRegIdx_2nd; adjSubFldRegIdx_3rd];
@@ -150,10 +150,10 @@ for i = 1:nFldReg
                 % if there is adjacent sub-flooded region except for true
                 % outlet connected sub-flooded region, make a list to visit
                 
+                toGoSubFldRegID = []; % list of sub-flooded region
                 nAdjSubFldReg = numel(adjSubFldRegIdx);
                 if nAdjSubFldReg > 0
                     
-                    toGoSubFldRegID = nan; % list of sub-flooded region
                     for k = 1:nAdjSubFldReg
                     
                         row = adjSubFldRegIdx(k);
@@ -185,13 +185,13 @@ for i = 1:nFldReg
                 % if the list is made, assign flow direction on each
                 % adjacent sub-flooded region
                 nToGoSubFldReg = numel(toGoSubFldRegID);
-                if nToGoSubFldReg > 0
+                if nToGoSubFldRegID > 0
 
                     % find a parent sub-flooded region ID for tree DB
                     nodeIdx = depthfirstiterator(root,ithFldRegTreeID);
                     nodeIdx(1) = [];
                     for m = nodeIdx
-                        tmpSubFldRegId = root.get(m);
+                        tmpSubFldRegID = root.get(m);
                         if tmpSubFldRegID == goneSubFldRegID(indicatorForParent);
                             parentSubFldRegID = m;
                         end
@@ -208,9 +208,9 @@ for i = 1:nFldReg
                             ,mFlowDir_SubFldReg,mFlowDir_Saddle] ...
                             = FindPathToMin(mRows,nCols,upStreamY,upStreamX,slopeAllNbr ...
                             ,m2SDSNbrY,m2SDSNbrX,regionalMin,fldRegID,subFldRegID ...
-                            ,arrivedRegMinY,arrivedRegMinX,ithFldRegID,targetSubFldRegID ...
+                            ,ithFldRegID,targetSubFldRegID ...
                             ,prevSubFldRegID,mFlowDir_SubFldReg,mFlowDir_Saddle ...
-                            ,ithFldRegOutIdx,sharedOutlet,goneConnectedSubFldReg);
+                            ,ithFldRegOutIdx,sharedOutlet,outConnectedSubFldRegID);
 
                         % record the arrived sub-flooded region ID at the tree DB
                         arrivedSubFldRegID = subFldRegID(arrivedRegMinY,arrivedRegMinX);

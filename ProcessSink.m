@@ -21,7 +21,7 @@ function [flood,m1SDSNbrY,m1SDSNbrX,m2SDSNbrY,m2SDSNbrX,fldRegID,nFldRegCells ..
 % @retval subFldRegOutInfo: information on sub-flooded region outlets
 % @retval sharedOutlet: number of shared depressions for an shared outlet
 %
-% @version: 2.1.7 / 2015-11-12
+% @version: 2.1.8 / 2015-11-12
 % @authoer: Jongmin Byun
 %==========================================================================
 

@@ -3,7 +3,7 @@ function [m2SDSNbrY,m2SDSNbrX,arrivedRegMinY,arrivedRegMinX ...
     = FindPathToMin(mRows,nCols,upStreamY,upStreamX,slopeAllNbr ...
     ,m2SDSNbrY,m2SDSNbrX,regionalMin,fldRegID,subFldRegID,ithFldRegID ...
     ,targetSubFldRegID,prevSubFldRegID,mFlowDir_SubFldReg,mFlowDir_Saddle ...
-    ,ithFldRegOutIdx,sharedOutlet,goneConSubFldReg)
+    ,ithFldRegOutIdx,sharedOutlet,outConnectedSubFldRegID)
 % @file FindPathToMin.m
 % @brief Function to find a path to a regional minima
 %
@@ -37,7 +37,7 @@ function [m2SDSNbrY,m2SDSNbrX,arrivedRegMinY,arrivedRegMinX ...
 % @retval mFlowDir_SubFldReg
 % @retval mFlowDir_Saddle
 %
-% @version 0.1.3. / 2015-11-12
+% @version 0.1.4. / 2015-11-12
 % @author Jongmin Byun
 %==========================================================================
 
@@ -53,8 +53,6 @@ ithOffset ... % offset for ith neighbour
 
 % main body ---------------------------------------------------------------
 % initial upstream coordinate
-initUpStreamY = upStreamY;
-initUpStreamX = upStreamX;
 initUpStreamIdx = sub2ind([mRows,nCols],upStreamY,upStreamX);
 firstMet_tf = true; % for a shared true outlet, the variable to indicate
                     % that it has already visited a sub-flooded region
@@ -134,7 +132,7 @@ while pathNotDone
 
                                 if subFldRegID(ithNbrIdx) > 0
 
-                                    if ~ismember(subFldRegID(ithNbrIdx),goneConSubFldReg)
+                                    if ~ismember(subFldRegID(ithNbrIdx),outConnectedSubFldRegID)
 
                                         if slopeAllNbr(upStreamY,upStreamX,ithNbr) ...
                                                 > steeperSlope

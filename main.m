@@ -1,4 +1,11 @@
 function main
+% @file main.m
+% @brief Function to extract stream longitudinal profiles from unfilled
+% DEMs
+%
+% @version 0.1.0. / 2015-11-12
+% @author Jongmin Byun
+%==========================================================================
 
 %% Load DEM
 
@@ -16,17 +23,31 @@ dX = R.DeltaX;
 dY = -R.DeltaY;
 DEM = double(DEM);
 
+%% For debug for a part of DEM
+tYMin = 826; tYMax = 850;
+tXMin = 301; tXMax = 325;
+
+DEM = DEM(tYMin:tYMax,tXMin:tXMax);
+[mRows,nCols] = size(DEM);
+
 %% Define target drainage
 % Note that you should check the location of the outlet of the test domain.
 % It should be located on the boundary of a drainage. If it is within the
 % drainage, you should modify the DEM
+
+% for the domain surrounded by null
 nanMask = (DEM == 32767);
 DEM(nanMask) = inf;
-
-s = strel('square',3); % structural element when eroding image
 DEMArea = ~nanMask;
 
+% for the domain filled with only elevations
+nanMask = true(mRows,nCols);
+nanMask(2:mRows-1,2:nCols-1) = false;
+DEMArea = ~nanMask;
+DEM(nanMask) = inf;
+
 % extract the boundary of the target drainage
+s = strel('square',3); % structural element when eroding image
 eDEMArea = imerode(DEMArea,s); 
 DEMAreaBnd = DEMArea & ~eDEMArea;
 DEMAreaBndIdx = find(DEMAreaBnd);
@@ -98,11 +119,11 @@ imagesc(diffDEM);
 colorbar;
 title('Difference in Elevation after Smoothing');
 
-%% For debug
-INPUT_DIR = '../data/input';
-dataFileName = 'b_PSink_2015-09-15.mat';
-dataFilePath = fullfile(INPUT_DIR,dataFileName);
-load(dataFilePath);
+% %% For debug for a whole DEM
+% INPUT_DIR = '../data/input';
+% dataFileName = 'b_PSink_2015-09-15.mat';
+% dataFilePath = fullfile(INPUT_DIR,dataFileName);
+% load(dataFilePath);
 
 %% Identify depressions and their outlets, then modify each depression
 % outlet's flow direction to go downstream when flows are overspilled
@@ -123,11 +144,11 @@ load(dataFilePath);
     = ProcessSink(DEM,targetDrainage,slopeAllNbr ...
         ,SDSNbrY,SDSNbrX,SDSFlowDirection);
     
-% For debug
-INPUT_DIR = '../data/input';
-dataFileName = 'a_PSink_2015-11-09.mat';
-dataFilePath = fullfile(INPUT_DIR,dataFileName);
-load(dataFilePath);
+% % For debug
+% INPUT_DIR = '../data/input';
+% dataFileName = 'a_PSink_2015-11-09.mat';
+% dataFilePath = fullfile(INPUT_DIR,dataFileName);
+% load(dataFilePath);
     
 % frequency distribution of the types of sub-flooded region's outlet
 figure(2); clf;
@@ -138,15 +159,15 @@ ylabel('Frequency');
 grid on
 
 % set boundary
-fXMin = 301; fXMax = 325;
-fYMin = 828; fYMax = 868;
+fXMin = 1; fXMax = nCols;
+fYMin = 1; fYMax = mRows;
 figure(3)
 
 subplot(2,2,1)
 imagesc(DEM(fYMin:fYMax,fXMin:fXMax));
 colorbar;
 set(gca,'DataAspectRatio',[1 1 1]);
-title('Flooded Region ID');
+title('DEM');
 
 subplot(2,2,2)
 imagesc(fldRegID(fYMin:fYMax,fXMin:fXMax));
