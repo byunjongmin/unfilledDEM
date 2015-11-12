@@ -377,10 +377,11 @@ for ithSink = 1:allSinksNo
                         
                     end
 
-                    % b. make subFldRegOutInfo for each outlet connected
-                    % sub-flooded region
                     nOutConnectedSubFldReg = numel(outConnectedSubFldRegID);
                     for i=1:nOutConnectedSubFldReg
+                        
+                        % b. make subFldRegOutInfo for each outlet connected
+                        % sub-flooded region
                         subFldRegOutInfo = [subFldRegOutInfo ...
                             ;ithFldReg ...
                             ,subFldRegID(beforeOutletCandY,beforeOutletCandX) ... % adjacent sub-flooded region ID
@@ -441,7 +442,12 @@ for ithSink = 1:allSinksNo
                             ,outConnectedSubFldRegID(i) ... % shared sub-flooded region ID
                             ,outletCandY,outletCandX];
                         
-                        % c. add the shared flooded region into the gone
+                        % c. procedure for the shared outelt combining
+                        % different sub-flooded regions
+                        sharedOutlet(outletCandY,outletCandX) ...
+                            = sharedOutlet(outletCandY,outletCandX) + 1;
+                        
+                        % d. add the shared flooded region into the gone
                         % sub-flooded region ID
                         goneSubFldRegID = outConnectedSubFldRegID(i);
                         mergedGoneSubFldRegID ...

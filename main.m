@@ -35,10 +35,10 @@ DEM = DEM(tYMin:tYMax,tXMin:tXMax);
 % It should be located on the boundary of a drainage. If it is within the
 % drainage, you should modify the DEM
 
-% for the domain surrounded by null
-nanMask = (DEM == 32767);
-DEM(nanMask) = inf;
-DEMArea = ~nanMask;
+% % for the domain surrounded by null
+% nanMask = (DEM == 32767);
+% DEM(nanMask) = inf;
+% DEMArea = ~nanMask;
 
 % for the domain filled with only elevations
 nanMask = true(mRows,nCols);

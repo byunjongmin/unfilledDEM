@@ -160,14 +160,14 @@ for i = 1:nFldReg
                         outletY = subFldRegOutInfo(row,4);
                         outletX = subFldRegOutInfo(row,5);
                         
-                        if sharedOutlet(ithFldRegOutIdx) == false
+                        if sharedOutlet(ithFldRegOutIdx) == 0
 
                             if ~ismember(adjSubFldRegID(row),goneSubFldRegID)
                                 toGoSubFldRegID = [toGoSubFldRegID; ...
                                     outletY,outletX,adjSubFldRegID(row)];
                             end
 
-                        else % sharedOutlet(ithFldRegOutIdx) == true
+                        else % sharedOutlet(ithFldRegOutIdx) ~= 0
 
                             if outletY == ithFldRegOutY && outletX == ithFldRegOutX
 
@@ -178,7 +178,7 @@ for i = 1:nFldReg
                                 end
                                 
                             end 
-                        end % if sharedOutlet(ithFldRegOutIdx) == false
+                        end % if sharedOutlet(ithFldRegOutIdx) == 0
                     end % for k = 1:nAdjSubFldReg
                 end % if nAdjSubFldReg > 0
 
