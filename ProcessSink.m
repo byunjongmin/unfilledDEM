@@ -21,7 +21,7 @@ function [flood,m1SDSNbrY,m1SDSNbrX,m2SDSNbrY,m2SDSNbrX,fldRegID,nFldRegCells ..
 % @retval subFldRegOutInfo: information on sub-flooded region outlets
 % @retval sharedOutlet: number of shared depressions for an shared outlet
 %
-% @version: 2.1.6 / 2015-11-09
+% @version: 2.1.7 / 2015-11-12
 % @authoer: Jongmin Byun
 %==========================================================================
 
@@ -45,7 +45,7 @@ OUTLET_DRY_NBR = 1; % outlet to dry neighbor
 OUTLET_WET_NBR = 2; % outlet to wet neighbor
 SHARED_OUTLET_DRY_NBR = 3; % shared outlet to dry neighbor
 SHARED_OUTLET_WET_NBR = 4; % shared outlet to wet neighbor
-SHARED_OUTLET_SURROUNDED_HIGH_ELEV = 5; % shared outlet surrounded by the cells with higher elevation
+SHARED_OUTLET_SURROUNDED_HIGH_ELEV = 5; % shared outlet surrounded by the cells with higher elevation. so not true outlet
 
 % Variables
 % for flooded regions and their outlets
@@ -197,7 +197,7 @@ for ithSink = 1:allSinksNo
             SHARED_OUTLET_SURROUNDED_HIGH_ELEV_tf = false; % shared outlet surrouned by the cells with higher elevation
             SHARED_OUTLET_WET_NBR_idx = 0; % shared outlet to wet neighbor
             
-            % if the candiate is not outlet,
+            % if the candiate is not an already defined outlet,
             if fldRegID(outletCandY,outletCandX) >= 0
                 
                 % searching for the neighbor enabling to drain
@@ -207,7 +207,7 @@ for ithSink = 1:allSinksNo
                     outletNbrY = outletCandY + ithNbrYOffset(ithNbr);
                     outletNbrX = outletCandX + ithNbrXOffset(ithNbr);
                     
-                    % if the steepest neighbor of the candidate is dry,
+                    % if a neighbor of the candidate is dry,
                     if flood(outletNbrY,outletNbrX) == UNFLOODED ...
                             || flood(outletNbrY,outletNbrX) == SINK
                         
@@ -260,11 +260,12 @@ for ithSink = 1:allSinksNo
                     end
                 end
                     
-            % if the candidate is an outlet 
+            % if the candidate is an already defined outlet,
+            % it is a shared outlet
             else % fldRegID(outletCandY,outletCandX) < 0
 
                 steeperSlope = 0;
-                sharedSubFldRegID = []; % linked sub-flooded region ID
+                outConnectedSubFldRegID = []; % outlet connected sub-flooded region ID
                 for ithNbr = 1:8
                     
                     outletNbrY = outletCandY + ithNbrYOffset(ithNbr);
@@ -296,9 +297,9 @@ for ithSink = 1:allSinksNo
                                 && oldFldRegOutX == outletCandX
                             
                             % for a flooded region sharing the outlet,
-                            % gather the information on the flooded region
-                            if ~ismember(subFldRegID(outletNbrY,outletNbrX),sharedSubFldRegID)
-                                sharedSubFldRegID = [sharedSubFldRegID ...
+                            % gather the information of the flooded region
+                            if ~ismember(subFldRegID(outletNbrY,outletNbrX),outConnectedSubFldRegID)
+                                outConnectedSubFldRegID = [outConnectedSubFldRegID ...
                                     ;subFldRegID(outletNbrY,outletNbrX)];
                             end
                             
@@ -376,18 +377,18 @@ for ithSink = 1:allSinksNo
                         
                     end
 
-                    % b. make subFldRegOutInfo for each shared
+                    % b. make subFldRegOutInfo for each outlet connected
                     % sub-flooded region
-                    nSharedSubFldReg = numel(sharedSubFldRegID);
-                    for i=1:nSharedSubFldReg
+                    nOutConnectedSubFldReg = numel(outConnectedSubFldRegID);
+                    for i=1:nOutConnectedSubFldReg
                         subFldRegOutInfo = [subFldRegOutInfo ...
                             ;ithFldReg ...
                             ,subFldRegID(beforeOutletCandY,beforeOutletCandX) ... % adjacent sub-flooded region ID
-                            ,sharedSubFldRegID(i) ... % shared sub-flooded region ID
+                            ,outConnectedSubFldRegID(i) ... % outlet connected sub-flooded region ID
                             ,outletCandY,outletCandX];
 
                         % added flooded region
-                        tFldRegID = unique(fldRegID(subFldRegID == sharedSubFldRegID(i)));
+                        tFldRegID = unique(fldRegID(subFldRegID == outConnectedSubFldRegID(i)));
                         tmpIdx = find(fldRegID == tFldRegID(tFldRegID > 0));
                         [tmpY,tmpX] = ind2sub([mRows,nCols],tmpIdx);
                         crtFldRegCell.Y(nCrtFldRegCells+1:nCrtFldRegCells+numel(tmpIdx)) = tmpY;
@@ -430,24 +431,24 @@ for ithSink = 1:allSinksNo
                     subFldRegOutlet(outletCandY,outletCandX) ...
                         = SHARED_OUTLET_SURROUNDED_HIGH_ELEV;
                     
-                    nSharedSubFldReg = numel(sharedSubFldRegID);
-                    for i=1:nSharedSubFldReg
+                    nOutConnectedSubFldReg = numel(outConnectedSubFldRegID);
+                    for i=1:nOutConnectedSubFldReg
                         
                         % b. make sub-flooded region info
                         subFldRegOutInfo = [subFldRegOutInfo ...
                             ;ithFldReg ...
                             ,subFldRegID(beforeOutletCandY,beforeOutletCandX) ... % adjacent sub-flooded region ID
-                            ,sharedSubFldRegID(i) ... % shared sub-flooded region ID
+                            ,outConnectedSubFldRegID(i) ... % shared sub-flooded region ID
                             ,outletCandY,outletCandX];
                         
                         % c. add the shared flooded region into the gone
                         % sub-flooded region ID
-                        goneSubFldRegID = sharedSubFldRegID(i);
+                        goneSubFldRegID = outConnectedSubFldRegID(i);
                         mergedGoneSubFldRegID ...
                             = [mergedGoneSubFldRegID;goneSubFldRegID];
                         
                         % *. reset the old flooded region
-                        tFldRegID = unique(fldRegID(subFldRegID == sharedSubFldRegID(i)));
+                        tFldRegID = unique(fldRegID(subFldRegID == outConnectedSubFldRegID(i)));
                         tmpIdx = find(fldRegID == tFldRegID(tFldRegID > 0));
                         flood(tmpIdx) = CURRENT_FLOODED;
 
