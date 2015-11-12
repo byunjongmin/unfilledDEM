@@ -32,7 +32,7 @@ function [m2SDSNbrY,m2SDSNbrX,mFlowDir_SubFldReg,mFlowDir_Saddle ...
 
 % constants
 [mRows,nCols] = size(DEM);
-ROOT_ID = 0;
+ROOT_ID = 1;
 
 % variables
 root = tree('Root Node'); % init the tree db of sub-flooded regions
@@ -137,43 +137,43 @@ for i = 1:nFldReg
             while pathNotDone
                 
                 % identify adjacent sub-flooded regions
-                adjSubFldRegIdx_2nd = find(subFldRegOutInfo(:,2) ...
+                adjSubFldRegRow_2nd = find(subFldRegOutInfo(:,2) ...
                                         == goneSubFldRegID(indicatorForParent));
-                adjSubFldRegID_2nd = subFldRegOutInfo(adjSubFldRegIdx_2nd,3);
-                adjSubFldRegIdx_3rd = find(subFldRegOutInfo(:,3)  ...
+                adjSubFldRegID_2nd = subFldRegOutInfo(adjSubFldRegRow_2nd,3);
+                adjSubFldRegRow_3rd = find(subFldRegOutInfo(:,3)  ...
                                         == goneSubFldRegID(indicatorForParent));
-                adjSubFldRegID_3rd = subFldRegOutInfo(adjSubFldRegIdx_3rd,2);
+                adjSubFldRegID_3rd = subFldRegOutInfo(adjSubFldRegRow_3rd,2);
                 
-                adjSubFldRegIdx = [adjSubFldRegIdx_2nd; adjSubFldRegIdx_3rd];
+                adjSubFldRegRow = [adjSubFldRegRow_2nd; adjSubFldRegRow_3rd];
                 adjSubFldRegID = [adjSubFldRegID_2nd; adjSubFldRegID_3rd];
                 
                 % if there is adjacent sub-flooded region except for true
                 % outlet connected sub-flooded region, make a list to visit
                 
                 toGoSubFldRegID = []; % list of sub-flooded region
-                nAdjSubFldReg = numel(adjSubFldRegIdx);
+                nAdjSubFldReg = numel(adjSubFldRegRow);
                 if nAdjSubFldReg > 0
                     
                     for k = 1:nAdjSubFldReg
                     
-                        row = adjSubFldRegIdx(k);
+                        row = adjSubFldRegRow(k);
                         outletY = subFldRegOutInfo(row,4);
                         outletX = subFldRegOutInfo(row,5);
                         
                         if sharedOutlet(ithFldRegOutIdx) == 0
 
-                            if ~ismember(adjSubFldRegID(row),goneSubFldRegID)
+                            if ~ismember(adjSubFldRegID(k),goneSubFldRegID)
                                 toGoSubFldRegID = [toGoSubFldRegID; ...
-                                    outletY,outletX,adjSubFldRegID(row)];
+                                    outletY,outletX,adjSubFldRegID(k)];
                             end
 
                         else % sharedOutlet(ithFldRegOutIdx) ~= 0
 
                             if outletY == ithFldRegOutY && outletX == ithFldRegOutX
 
-                                if ~ismember(adjSubFldRegID(row),outConnectedSubFldRegID)
+                                if ~ismember(adjSubFldRegID(k),outConnectedSubFldRegID)
                                     outConnectedSubFldRegID = [outConnectedSubFldRegID; ...
-                                                                adjSubFldRegID(row)];
+                                                                adjSubFldRegID(k)];
                                     nOutConnectedSubFldReg = nOutConnectedSubFldReg + 1;
                                 end
                                 
@@ -184,8 +184,7 @@ for i = 1:nFldReg
 
                 % if the list is made, assign flow direction on each
                 % adjacent sub-flooded region
-                nToGoSubFldReg = numel(toGoSubFldRegID);
-                if nToGoSubFldRegID > 0
+                if ~isempty(toGoSubFldRegID)
 
                     % find a parent sub-flooded region ID for tree DB
                     nodeIdx = depthfirstiterator(root,ithFldRegTreeID);
@@ -196,7 +195,8 @@ for i = 1:nFldReg
                             parentSubFldRegID = m;
                         end
                     end
-
+                    
+                    nToGoSubFldReg = numel(toGoSubFldRegID(:,1));
                     for l = 1:nToGoSubFldReg
 
                         upStreamY = toGoSubFldRegID(l,1);

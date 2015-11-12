@@ -240,8 +240,9 @@ while pathNotDone
         % (b) Change upstream cell with downstream cell
         upStreamY = steepestNbrY;
         upStreamX = steepestNbrX;
-
+        
         % continue to find the SDC
+        upStreamIdx = sub2ind([mRows,nCols],upStreamY,upStreamX);
         steeperSlope = 0; % for the target sub-flooded region
         for i = 1:8
 

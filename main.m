@@ -198,6 +198,8 @@ title('Sub-flooded Region Outlet');
     = AssignFlowDirInFldReg(m2SDSNbrY,m2SDSNbrX,subFldRegOutInfo,DEM ...
     ,slopeAllNbr,regionalMin,fldRegID,subFldRegID,sharedOutlet);
 
+disp(subFldRegTree.tostring);
+
 %% Calculate upstream cells number of all cells within every depression
 
 % A. Calculate the number of upstream cells out of flooded region
