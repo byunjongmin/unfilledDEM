@@ -25,7 +25,7 @@ function [nUpstreamCells,doNotAccFlowCell] ...
 % constants
 GONE_WSD = 4;
 
-% sort cells according to sub-flooded region ID, elevation, flat outlet
+% sort cells according to sub-flooded region ID, elevation
 targetDrainage ... % avoid flat without flow direction
     (steepestDescentSlope <= 0) = false;
 
@@ -45,19 +45,20 @@ for i = 1:nTotalCells
     iCellY = sortedDEMYX(i,1); % Y and X coordinate of ith cell
     iCellX = sortedDEMYX(i,2);
     
+    % if iCell is involved in current sub-flooded region
     if iSubFldRegMap(iCellY,iCellX) == true
 
         nUpstreamCells(iCellY,iCellX) ...
             = nUpstreamCells(iCellY,iCellX) + 1;
         % add the current sub-flooded region to the exception list
-        doNotAccFlowCell(iCellY,iCellX) = GONE_WSD;
-        
+        doNotAccFlowCell(iCellY,iCellX) = GONE_WSD;        
     end
     
     dStreamNbrY = m2SDSNbrY(iCellY,iCellX); % down stream neighbour Y
     dStreamNbrX = m2SDSNbrX(iCellY,iCellX); % down stream neighbour X
         
-    if iSubFldRegMap(dStreamNbrY,dStreamNbrX) ~= 0
+    if iSubFldRegMap(dStreamNbrY,dStreamNbrX) == true
+        
         nUpstreamCells(dStreamNbrY,dStreamNbrX) ...
             = nUpstreamCells(dStreamNbrY,dStreamNbrX) ...
             + nUpstreamCells(iCellY,iCellX);
