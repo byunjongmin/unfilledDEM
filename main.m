@@ -234,23 +234,22 @@ nUpstreamCellsWithFldReg = CalcUpstreamCellsWithFldReg(DEM,targetDrainage ...
 nUpstreamCells ...
     = CalcUpstreamCellsInSubFldReg(subFldRegTree,mFlowDir_SubFldReg ...
     ,mFlowDir_Saddle,fldRegID,nUpstreamCellsWithFldReg,fldRegInfo ...
-    ,m2SDSNbrY,m2SDSNbrX,steepestDescentSlope ...
-    ,subFldRegID,DEM,regionalMin,flatRegMap,nFlatRegCells);   
-
-% c. export the number of upstream cells for ArcGIS
-nUpstreamCellsMap = nUpstreamCells;
-tFilePath = fullfile(OUTPUT_DIR,'nUpstreamCellsMap');
-ExportRasterAsArcGrid(tFilePath,nUpstreamCellsMap,dY,xllcorner(1),yllcorner(1));
+    ,m2SDSNbrY,m2SDSNbrX,steepestDescentSlope,subFldRegID,DEM,regionalMin);   
 
 % Visualization for the number of upstream cells
-figure(2);
-set(gcf,'Color',[l 1 l])
+figure(5);
+set(gcf,'Color',[1 1 1])
 % imagesc(log(nUpstreamCells(2:end-1,2:end-1)));
 imagesc(nUpstreamCells(2:end-1,2:end-1));
 axis image
 set(gca,'YTick',[],'XTick' ,[])
 colormap(flipud(colormap(gray)))
 colorbar
+
+% c. export the number of upstream cells for ArcGIS
+nUpstreamCellsMap = nUpstreamCells;
+tFilePath = fullfile(OUTPUT_DIR,'nUpstreamCellsMap');
+ExportRasterAsArcGrid(tFilePath,nUpstreamCellsMap,dY,xllcorner(1),yllcorner(1));
 
 %% Make stream network
 % 유역면적이 일정면적 이상인 셀을 하천으로 정의함

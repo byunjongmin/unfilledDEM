@@ -1,6 +1,6 @@
 function [nUpstreamCells,doNotAccFlowCell] ...
     = mCalcUpstreamCells(nUpstreamCells,DEM,targetDrainage ...
-    ,m2SDSNbrY,m2SDSNbrX,flatRegMap,nFlatRegCells,steepestDescentSlope ...
+    ,m2SDSNbrY,m2SDSNbrX,steepestDescentSlope ...
     ,iSubFldRegMap,doNotAccFlowCell)
 % @file mCalcUpstreamCells.m
 % @brief Calculate upstream cells of cells within a sub flooded region
@@ -18,7 +18,8 @@ function [nUpstreamCells,doNotAccFlowCell] ...
 % @retval nUpstreamCells
 % @retval doNotAccFlowCell
 %
-% @version 2.0
+% @version 2.0.0 / 2015-11-13
+% @author Jongmin Byun
 %==========================================================================
 
 % constants
@@ -26,40 +27,28 @@ GONE_WSD = 4;
 
 % sort cells according to sub-flooded region ID, elevation, flat outlet
 targetDrainage ... % avoid flat without flow direction
-    (abs(flatRegMap) > 0 & steepestDescentSlope <= 0) = false;
+    (steepestDescentSlope <= 0) = false;
 
 [vtY,vtX] = find(targetDrainage); % vector Y, vector X
 vtDEM = DEM(targetDrainage); % vector DEM
-
-flatOut = flatRegMap < 0; % outlet of flat
-vtFlatOut = flatOut(targetDrainage); % vector of flat outlet
-
 vtISubFldReg ... % vector of sub-flooded region ID
     = iSubFldRegMap(targetDrainage);
 
-sortedDEMYX = [vtY,vtX,vtISubFldReg,vtDEM,vtFlatOut];
-sortedDEMYX = sortrows(sortedDEMYX,[3,-4,5]);
+sortedDEMYX = [vtY,vtX,vtISubFldReg,vtDEM];
+sortedDEMYX = sortrows(sortedDEMYX,[3,-4]);
 
 nTotalCells = size(vtY,1);
 
 % calculate upstream cells number
-for iCell = 1:nTotalCells
+for i = 1:nTotalCells
     
-    iCellY = sortedDEMYX(iCell,1); % Y and X coordinate of ith cell
-    iCellX = sortedDEMYX(iCell,2);
+    iCellY = sortedDEMYX(i,1); % Y and X coordinate of ith cell
+    iCellX = sortedDEMYX(i,2);
     
     if iSubFldRegMap(iCellY,iCellX) == true
-        % if ith cell is flat outlet, additionally add flat cells without
-        % flow direction
-        if nFlatRegCells(iCellY,iCellX) > 0
-            nUpstreamCells(iCellY,iCellX) ...
-                = nUpstreamCells(iCellY,iCellX) + 1 ...
-                + nFlatRegCells(iCellY,iCellX);
-        else
-            nUpstreamCells(iCellY,iCellX) ...
-                = nUpstreamCells(iCellY,iCellX) + 1;
-        end
-        
+
+        nUpstreamCells(iCellY,iCellX) ...
+            = nUpstreamCells(iCellY,iCellX) + 1;
         % add the current sub-flooded region to the exception list
         doNotAccFlowCell(iCellY,iCellX) = GONE_WSD;
         
@@ -67,43 +56,10 @@ for iCell = 1:nTotalCells
     
     dStreamNbrY = m2SDSNbrY(iCellY,iCellX); % down stream neighbour Y
     dStreamNbrX = m2SDSNbrX(iCellY,iCellX); % down stream neighbour X
-
-    if flatRegMap(dStreamNbrY,dStreamNbrX) > 0 ...
-        && steepestDescentSlope(dStreamNbrY,dStreamNbrX) == 0
-    
-        flatOutY = m2SDSNbrY(dStreamNbrY,dStreamNbrX);
-        flatOutX = m2SDSNbrX(dStreamNbrY,dStreamNbrX);
         
-        nUpstreamCells(flatOutY,flatOutX) ...
-            = nUpstreamCells(flatOutY,flatOutX) ...
+    if iSubFldRegMap(dStreamNbrY,dStreamNbrX) ~= 0
+        nUpstreamCells(dStreamNbrY,dStreamNbrX) ...
+            = nUpstreamCells(dStreamNbrY,dStreamNbrX) ...
             + nUpstreamCells(iCellY,iCellX);
-        
-    else
-        
-        if iSubFldRegMap(dStreamNbrY,dStreamNbrX) ~= 0
-            nUpstreamCells(dStreamNbrY,dStreamNbrX) ...
-                = nUpstreamCells(dStreamNbrY,dStreamNbrX) ...
-                + nUpstreamCells(iCellY,iCellX);
-        end
     end
-end
-
-% calculate the number of upstream cells of flat without flow direction
-% in each flat
-[tmpFlatOutY,tmpFlatOutX] ...
-    = find(flatRegMap < 0 & nFlatRegCells > 0 ...
-        & iSubFldRegMap);
-nFlat = size(tmpFlatOutY,1):
-
-for ithFlat = 1:nFlat
-
-    iFlatOutY = tmpFlatOutY(ithFlat,1);
-    iFlatOutX = tmpFlatOutX(ithFlat,1);
-
-    iFlatID = abs(flatRegMap(iFlatOutY,iFlatOutX));
-    iFlatWithoutFlwDir ...
-        = flatRegMap == iFlatID & steepestDescentSlope <= 0;
-    nUpstreamCells(iFlatWithoutFlwDir) ...
-        = nUpstreamCells(iFlatOutY,iFlatoutX) - 1;
-    
 end
