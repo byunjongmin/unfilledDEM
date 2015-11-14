@@ -1,8 +1,7 @@
 function nUpstreamCells ...
     = CalcUpstreamCellsInSubFldReg(root,mFlowDir_SubFldReg ...
     ,mFlowDir_Saddle,fldRegID,nUpstreamCells,fldRegInfo ...
-    ,m2SDSNbrY,m2SDSNbrX,steepestDescentSlope ...
-    ,subFldRegID,DEM,regionalMin)
+    ,m2SDSNbrY,m2SDSNbrX,subFldRegID,DEM,regionalMin)
 % @file CalcUpstreamCellsInSubFldReg.m
 % @brief Calculate the number of upstream cells of cells in each flooded
 % region
@@ -22,7 +21,7 @@ function nUpstreamCells ...
 % @param[in] nFlatRegCells
 % @retval nUpstreamCells
 %
-% @version 2.0.1 / 2015-11-13
+% @version 2.0.2 / 2015-11-14
 %
 % @author Jongmin Byun
 %==========================================================================
@@ -35,17 +34,19 @@ GONE_WSD = 4;
 
 % variables
 s = strel('square',3); % structural element when dilating image
+
 treeDepth = root.depthtree; % coordinated tree where each node holds its depth
 nChildNode = tree(root,0); % copy-constructor for the root tree. a tree for the number of children nodes
 nChildNode2 = tree(root,0); % a tree for the number of children nodes to be processed
-nUpstreamCells(fldRegID > 0) = 0; % reset upstream cells numbers for flooded regions
 
-prevNUpstreamCells = nUpstreamCells; % mask for current sub-flooded region
+nUpstreamCells(fldRegID > 0) = 0; % mask for current sub-flooded region, reset upstream cells numbers for flooded regions
+prevNUpstreamCells = nUpstreamCells; % for whole region
+
 doNotAccFlowMask = ... % cells not to be processed for the first time in mCalcUpstreamCells function
     mFlowDir_SubFldReg == FROM_TARWSD_TO_TARWSD ...
     | mFlowDir_SubFldReg == FROM_REGMIN_TO_UP;
-markGoneFlowCell = nan(mRows,nCols); % to mark trace
-markGoneFlowCell(doNotAccFlowMask) = mFlowDir_SubFldReg(doNotAccFlowMask);
+markForGoneCells = nan(mRows,nCols); % to mark trace
+markForGoneCells(doNotAccFlowMask) = mFlowDir_SubFldReg(doNotAccFlowMask);
 
 nFldReg = numel(fldRegInfo(:,1));
 for i = 1:nFldReg
@@ -69,8 +70,9 @@ for i = 1:nFldReg
     % b. identify all leaf nodes of the ith flooded region
     % and calculate how many children nodes each parent node has
     leafNodeID = [];
-    nodeIdx = depthfirstiterator(root,ithFldRegTreeID);
-    nodeIdx(1) = [];
+    % make a vector of nodes that traverse tree in a depth first manner
+    nodeIdx = depthfirstiterator(root,ithFldRegTreeID); % for nodes of tree depth = 1
+    nodeIdx(1) = []; % remove the head of ithFldRegTreeID
     for j = nodeIdx
         
         % make a list for leaf nodes
@@ -111,17 +113,17 @@ for i = 1:nFldReg
             % previously defined sub-flooded region outlet
             targetDrainage = ~isnan(DEM) ...
                 & dIthSubFldRegMap ...
-                & (markGoneFlowCell ~= FROM_REGMIN_TO_UP ... % flow direction modified cell
-                    & markGoneFlowCell ~= FROM_TARWSD_TO_TARWSD) ...
+                & (markForGoneCells ~= FROM_REGMIN_TO_UP ... % flow direction modified cell
+                    & markForGoneCells ~= FROM_TARWSD_TO_TARWSD) ...
                 & (mFlowDir_Saddle == NOT_MODIFIED ... % sub-flooded region outlet
                     | mFlowDir_Saddle == currentSubFldRegID); %% <- is it right?
                     
             nUpstreamCells = prevNUpstreamCells;
             % calculate the number of upstream cells over chosen area
-            [nUpstreamCells,markGoneFlowCell] ...
+            [nUpstreamCells,markForGoneCells] ...
                 = mCalcUpstreamCells(nUpstreamCells,DEM ...
                 ,targetDrainage,m2SDSNbrY,m2SDSNbrX ...
-                ,steepestDescentSlope,iSubFldRegMap,markGoneFlowCell);
+                ,iSubFldRegMap,markForGoneCells);
             
             % calculate upstream cells number for the remainder:
             % from the regional minima to its outlet
@@ -136,7 +138,7 @@ for i = 1:nFldReg
             while pathBNotDone
             
                 % add one for itself
-                if markGoneFlowCell(downStreamY,downStreamX) ...
+                if markForGoneCells(downStreamY,downStreamX) ...
                         ~= GONE_WSD % avoid the flat already calculated
                     nUpstreamCells(downStreamY,downStreamX) ...
                         = nUpstreamCells(downStreamY,downStreamX) + 1;
@@ -148,14 +150,14 @@ for i = 1:nFldReg
                 if iSubFldRegMap(upStreamNbrY,upStreamNbrX) == false
 
                     pathBNotDone = false;
-                    markGoneFlowCell(downStreamY,downStreamX) = GONE_WSD;
+                    markForGoneCells(downStreamY,downStreamX) = GONE_WSD;
                     
                 else
                     
-                    if markGoneFlowCell(downStreamY,downStreamX) ...
+                    if markForGoneCells(downStreamY,downStreamX) ...
                             ~= GONE_WSD % avoid the flat already calculated
                         
-                        markGoneFlowCell(downStreamY,downStreamX) = GONE_WSD;
+                        markForGoneCells(downStreamY,downStreamX) = GONE_WSD;
                         % transfer upstream cells number to the downstream cell
                         
                         nUpstreamCells(upStreamNbrY,upStreamNbrX) ...
