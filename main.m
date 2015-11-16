@@ -3,7 +3,7 @@ function main
 % @brief Function to extract stream longitudinal profiles from unfilled
 % DEMs
 %
-% @version 0.1.0. / 2015-11-12
+% @version 0.1.1. / 2015-11-16
 % @author Jongmin Byun
 %==========================================================================
 
@@ -23,28 +23,28 @@ dX = R.DeltaX;
 dY = -R.DeltaY;
 DEM = double(DEM);
 
-%% For debug for a part of DEM
-tYMin = 826; tYMax = 850;
-tXMin = 301; tXMax = 325;
-
-DEM = DEM(tYMin:tYMax,tXMin:tXMax);
-[mRows,nCols] = size(DEM);
+% %% For debug for a part of DEM
+% tYMin = 546; tYMax = 850;
+% tXMin = 276; tXMax = 350;
+% 
+% DEM = DEM(tYMin:tYMax,tXMin:tXMax);
+% [mRows,nCols] = size(DEM);
 
 %% Define target drainage
 % Note that you should check the location of the outlet of the test domain.
 % It should be located on the boundary of a drainage. If it is within the
 % drainage, you should modify the DEM
 
-% % for the domain surrounded by null
-% nanMask = (DEM == 32767);
-% DEM(nanMask) = inf;
-% DEMArea = ~nanMask;
-
-% for the domain filled with only elevations
-nanMask = true(mRows,nCols);
-nanMask(2:mRows-1,2:nCols-1) = false;
-DEMArea = ~nanMask;
+% for the domain surrounded by null
+nanMask = (DEM == 32767);
 DEM(nanMask) = inf;
+DEMArea = ~nanMask;
+
+% % for the domain filled with only elevations
+% nanMask = true(mRows,nCols);
+% nanMask(2:mRows-1,2:nCols-1) = false;
+% DEMArea = ~nanMask;
+% DEM(nanMask) = inf;
 
 % extract the boundary of the target drainage
 s = strel('square',3); % structural element when eroding image
@@ -112,10 +112,13 @@ end
 figure(1);
 subplot(1,2,1);
 imagesc(flatRegMap);
+set(gca,'DataAspectRatio',[1 1 1]);
 title('Distribution of Flat Region');
+
 subplot(1,2,2);
 diffDEM = orgDEM - DEM; % for debug
 imagesc(diffDEM);
+set(gca,'DataAspectRatio',[1 1 1]);
 colorbar;
 title('Difference in Elevation after Smoothing');
 
@@ -124,6 +127,13 @@ title('Difference in Elevation after Smoothing');
 % dataFileName = 'b_PSink_2015-09-15.mat';
 % dataFilePath = fullfile(INPUT_DIR,dataFileName);
 % load(dataFilePath);
+
+%% Remove isolated area
+
+DEM_BW = false(mRows,nCols); % binary of DEM
+DEM_BW(~isinf(DEM)) = true;
+CC = bwconncomp(DEM_BW); % identify connected components of valid cells
+DEM(CC.PixelIdxList{2:end}) = inf; % remove the connected components except for the target area
 
 %% Identify depressions and their outlets, then modify each depression
 % outlet's flow direction to go downstream when flows are overspilled
@@ -204,8 +214,8 @@ disp(subFldRegTree.tostring);
 % draw a stream longitudinal profile on the interesting stream path
 
 % record stream path using the input initial and end point coordinates
-initY = 3; initX = 12;
-endY = 21; endX = 9;
+initY = 184; initX = 357;
+endY = outletY; endX = outletX;
 [streamPath,distFromInit] = RecordStrPath(initY,initX,endY,endX ...
     ,mRows,nCols,m2SDSNbrY,m2SDSNbrX,dY,dX);
 
@@ -240,16 +250,16 @@ nUpstreamCells ...
 figure(5);
 set(gcf,'Color',[1 1 1])
 % imagesc(log(nUpstreamCells(2:end-1,2:end-1)));
-imagesc(nUpstreamCells(2:end-1,2:end-1));
+imagesc(nUpstreamCellsWithFldReg(2:end-1,2:end-1));
 axis image
 set(gca,'YTick',[],'XTick' ,[])
 colormap(flipud(colormap(gray)))
 colorbar
 
-% c. export the number of upstream cells for ArcGIS
-nUpstreamCellsMap = nUpstreamCells;
-tFilePath = fullfile(OUTPUT_DIR,'nUpstreamCellsMap');
-ExportRasterAsArcGrid(tFilePath,nUpstreamCellsMap,dY,xllcorner(1),yllcorner(1));
+% % c. export the number of upstream cells for ArcGIS
+% nUpstreamCellsMap = nUpstreamCells;
+% tFilePath = fullfile(OUTPUT_DIR,'nUpstreamCellsMap');
+% ExportRasterAsArcGrid(tFilePath,nUpstreamCellsMap,dY,xllcorner(1),yllcorner(1));
 
 %% Make stream network
 % 유역면적이 일정면적 이상인 셀을 하천으로 정의함

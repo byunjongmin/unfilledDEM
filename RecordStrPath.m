@@ -19,11 +19,14 @@ accDist = 0;
 ithCellIdx = initIdx;
 while ithCellIdx ~= endIdx
     
-    % for debugging
-    % [tmpY,tmpX] = ind2sub([mRows,nCols],ithCellIdx)
-    
     nextCellIdx = sub2ind([mRows,nCols] ...
         ,SDSNbrY(ithCellIdx),SDSNbrX(ithCellIdx));
+    
+    if ismember(nextCellIdx,streamPath)
+        % for debugging
+        [tmpY,tmpX] = ind2sub([mRows,nCols],ithCellIdx)
+        error('Error: Infinite loop in RecordStrPath function.');
+    end
     
     streamPath = [streamPath; nextCellIdx];
     
@@ -40,7 +43,6 @@ while ithCellIdx ~= endIdx
     end
     
     ithCellIdx = nextCellIdx;
-
     distFromInit = [distFromInit; accDist];
     
 end

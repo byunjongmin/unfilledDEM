@@ -82,8 +82,8 @@ for i = 1:8
     [ithNbrY,ithNbrX] = ind2sub([mRows,nCols],ithNbrIdx);
 
     % for the cell within the domain boundary            
-    if (1 < ithNbrY && ithNbrY < Y+2) ...
-           && (1 < ithNbrX && ithNbrX < X+2)
+    if (1 <= ithNbrY && ithNbrY <= Y+2) ...
+           && (1 <= ithNbrX && ithNbrX <= X+2)
        
         % for the ith flooded region
         if fldRegID(ithNbrIdx) == ithFldRegID
