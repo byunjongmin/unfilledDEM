@@ -26,7 +26,7 @@ function [m2SDSNbrY,m2SDSNbrX,mFlowDir_SubFldReg,mFlowDir_Saddle ...
 % @retval root: tree database of sub-flooded regions
 % @retval fldRegInfo
 %
-% @version 0.2.1 / 2015-11-12
+% @version 0.2.2 / 2015-11-16
 % @author Jongmin Byun
 %==========================================================================
 
@@ -184,19 +184,19 @@ for i = 1:nFldReg
                                     % sub-flooded region
                                     outConnectedSubFldRegID ...
                                         = [outConnectedSubFldRegID;adjSubFldRegID(k)];
-                                    nOutConnectedSubFldReg = nOutConnectedSubFldReg + 1;
-                                    
-                                else
-                                    
-                                    if ~ismember(adjSubFldRegID(k),goneSubFldRegID)
-                                        % list for saddle connected sub-flooded region
-                                        toGoSubFldRegID = [toGoSubFldRegID; ...
-                                            outletY,outletX,adjSubFldRegID(k)];
-                                    end
+                                    nOutConnectedSubFldReg = nOutConnectedSubFldReg + 1; 
                                 end
-                            end
-                            
+                                    
+                            else
+                                    
+                                if ~ismember(adjSubFldRegID(k),goneSubFldRegID)
+                                    % list for saddle connected sub-flooded region
+                                    toGoSubFldRegID = [toGoSubFldRegID; ...
+                                        outletY,outletX,adjSubFldRegID(k)];
+                                end
+                            end                            
                         end % if sharedOutlet(ithFldRegOutIdx) == 0
+                        
                     end % for k = 1:nAdjSubFldReg
                 end % if nAdjSubFldReg > 0
 
