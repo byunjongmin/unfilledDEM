@@ -88,7 +88,7 @@ for i = 1:nFldReg
     % firstly, find a path from the true outlet to the minimum of the first
     % visit sub-flooded region
     
-    % set variables for FindPathToMin function
+    % set variables for the first operation of the FindPathToMin function
     upStreamY = ithFldRegOutY;
     upStreamX = ithFldRegOutX;
     prevSubFldRegID = nan; % previously gone sub-flooded region ID
@@ -124,7 +124,10 @@ for i = 1:nFldReg
         goneSubFldRegID = [goneSubFldRegID; arrivedSubFldRegID];
         % record the arrived sub-flooded region as true outlet connected
         % flooded region
-        outConnectedSubFldRegID = [outConnectedSubFldRegID;arrivedSubFldRegID];
+        if ~ismember(arrivedSubFldRegID,outConnectedSubFldRegID)
+            outConnectedSubFldRegID ...
+                = [outConnectedSubFldRegID;arrivedSubFldRegID];
+        end
         
         % if the number of sub-flooded regions is more than one,
         % identify adjacent sub-flooded regions for the arrivied one
@@ -147,8 +150,9 @@ for i = 1:nFldReg
                 adjSubFldRegRow = [adjSubFldRegRow_2nd; adjSubFldRegRow_3rd];
                 adjSubFldRegID = [adjSubFldRegID_2nd; adjSubFldRegID_3rd];
                 
-                % if there is adjacent sub-flooded region except for true
-                % outlet connected sub-flooded region, make a list to visit
+                % if there is adjacent sub-flooded region, make lists for
+                % true outlet connected sub-flooded region and saddle
+                % connected sub-flooded region
                 
                 toGoSubFldRegID = []; % list of sub-flooded region
                 nAdjSubFldReg = numel(adjSubFldRegRow);
@@ -161,23 +165,37 @@ for i = 1:nFldReg
                         outletX = subFldRegOutInfo(row,5);
                         
                         if sharedOutlet(ithFldRegOutIdx) == 0
-
+                            
+                            % not for the shared true outlet
                             if ~ismember(adjSubFldRegID(k),goneSubFldRegID)
+                                
+                                % list for saddle connected sub-flooded region
                                 toGoSubFldRegID = [toGoSubFldRegID; ...
                                     outletY,outletX,adjSubFldRegID(k)];
                             end
 
                         else % sharedOutlet(ithFldRegOutIdx) ~= 0
-
+                            
+                            % for the shared true outlet
                             if outletY == ithFldRegOutY && outletX == ithFldRegOutX
 
                                 if ~ismember(adjSubFldRegID(k),outConnectedSubFldRegID)
-                                    outConnectedSubFldRegID = [outConnectedSubFldRegID; ...
-                                                                adjSubFldRegID(k)];
+                                    % list for true outlet connected
+                                    % sub-flooded region
+                                    outConnectedSubFldRegID ...
+                                        = [outConnectedSubFldRegID;adjSubFldRegID(k)];
                                     nOutConnectedSubFldReg = nOutConnectedSubFldReg + 1;
+                                    
+                                else
+                                    
+                                    if ~ismember(adjSubFldRegID(k),goneSubFldRegID)
+                                        % list for saddle connected sub-flooded region
+                                        toGoSubFldRegID = [toGoSubFldRegID; ...
+                                            outletY,outletX,adjSubFldRegID(k)];
+                                    end
                                 end
-                                
-                            end 
+                            end
+                            
                         end % if sharedOutlet(ithFldRegOutIdx) == 0
                     end % for k = 1:nAdjSubFldReg
                 end % if nAdjSubFldReg > 0
@@ -223,10 +241,13 @@ for i = 1:nFldReg
                     end % for l = 1=nToGoSubFldReg
                 end % if nToGoSubFldReg > 0
 
+                % check the remaining nodes in the list for saddle
+                % connected sub-flooded region
                 indicatorForParent = indicatorForParent + 1;
                 if indicatorForParent > numel(goneSubFldRegID)
                     pathNotDone = false;
                 end
+                
             end % while pathNotDone
         end % if nSubFldRegInIthFldReg > 1
     end % for j = 1:nOutConnectedSubFldReg

@@ -24,7 +24,8 @@ while ithCellIdx ~= endIdx
     
     if ismember(nextCellIdx,streamPath)
         % for debugging
-        [tmpY,tmpX] = ind2sub([mRows,nCols],ithCellIdx)
+        [tmpY2,tmpX2] = ind2sub([mRows,nCols],streamPath)
+        [tmpY,tmpX] = ind2sub([mRows,nCols],nextCellIdx)
         error('Error: Infinite loop in RecordStrPath function.');
     end
     

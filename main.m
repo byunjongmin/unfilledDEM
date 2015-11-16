@@ -23,28 +23,28 @@ dX = R.DeltaX;
 dY = -R.DeltaY;
 DEM = double(DEM);
 
-% %% For debug for a part of DEM
-% tYMin = 546; tYMax = 850;
-% tXMin = 276; tXMax = 350;
-% 
-% DEM = DEM(tYMin:tYMax,tXMin:tXMax);
-% [mRows,nCols] = size(DEM);
+%% For debug for a part of DEM
+tYMin = 311; tYMax = 370;
+tXMin = 146; tXMax = 195;
+
+DEM = DEM(tYMin:tYMax,tXMin:tXMax);
+[mRows,nCols] = size(DEM);
 
 %% Define target drainage
 % Note that you should check the location of the outlet of the test domain.
 % It should be located on the boundary of a drainage. If it is within the
 % drainage, you should modify the DEM
 
-% for the domain surrounded by null
-nanMask = (DEM == 32767);
-DEM(nanMask) = inf;
-DEMArea = ~nanMask;
-
-% % for the domain filled with only elevations
-% nanMask = true(mRows,nCols);
-% nanMask(2:mRows-1,2:nCols-1) = false;
-% DEMArea = ~nanMask;
+% % for the domain surrounded by null
+% nanMask = (DEM == 32767);
 % DEM(nanMask) = inf;
+% DEMArea = ~nanMask;
+
+% for the domain filled with only elevations
+nanMask = true(mRows,nCols);
+nanMask(2:mRows-1,2:nCols-1) = false;
+DEMArea = ~nanMask;
+DEM(nanMask) = inf;
 
 % extract the boundary of the target drainage
 s = strel('square',3); % structural element when eroding image
@@ -133,7 +133,10 @@ title('Difference in Elevation after Smoothing');
 DEM_BW = false(mRows,nCols); % binary of DEM
 DEM_BW(~isinf(DEM)) = true;
 CC = bwconncomp(DEM_BW); % identify connected components of valid cells
-DEM(CC.PixelIdxList{2:end}) = inf; % remove the connected components except for the target area
+if CC.NumObjects > 1
+    DEM(CC.PixelIdxList{2:end}) = inf; % remove the connected components except for the target area
+    targetDrainage(CC.PixelIdxList{2:end}) = false;
+end
 
 %% Identify depressions and their outlets, then modify each depression
 % outlet's flow direction to go downstream when flows are overspilled
@@ -211,11 +214,51 @@ title('Sub-flooded Region Outlet');
 % display the tree DB of flooded region
 disp(subFldRegTree.tostring);
 
-% draw a stream longitudinal profile on the interesting stream path
+%% Calculate upstream cells number of all cells within every depression
+
+% A. Calculate the number of upstream cells out of flooded region
+nUpstreamCellsWithFldReg = CalcUpstreamCellsWithFldReg(DEM,targetDrainage ...
+    ,flood,m1SDSNbrY,m1SDSNbrX,fldRegID,nFldRegCells);
+
+% B. Calculate flow accumulation within each flooded region
+nUpstreamCells ...
+    = CalcUpstreamCellsInSubFldReg(subFldRegTree,mFlowDir_SubFldReg ...
+    ,mFlowDir_Saddle,fldRegID,nUpstreamCellsWithFldReg,fldRegInfo ...
+    ,m2SDSNbrY,m2SDSNbrX,subFldRegID,DEM,regionalMin);   
+
+% Visualization for the number of upstream cells
+figure(5);
+set(gcf,'Color',[1 1 1])
+
+subplot(1,3,1)
+imagesc(nUpstreamCellsWithFldReg(2:end-1,2:end-1));
+title('Upstream Cells No. with Depressions');
+axis image
+set(gca,'YTick',[],'XTick' ,[])
+colormap(flipud(colormap(gray)))
+colorbar
+
+subplot(1,3,2)
+imagesc(nUpstreamCells(2:end-1,2:end-1));
+title('Upstream Cells No.');
+axis image
+set(gca,'YTick',[],'XTick' ,[])
+colormap(flipud(colormap(gray)))
+colorbar
+
+subplot(1,3,3)
+imagesc(log(nUpstreamCells(2:end-1,2:end-1)));
+title('Upstream Cells No. [Log]');
+axis image
+set(gca,'YTick',[],'XTick' ,[])
+colormap(flipud(colormap(gray)))
+colorbar
+
+%% draw a stream longitudinal profile on the interesting stream path
 
 % record stream path using the input initial and end point coordinates
-initY = 184; initX = 357;
-endY = outletY; endX = outletX;
+initY = 22; initX = 39;
+endY = 29; endX = 46;
 [streamPath,distFromInit] = RecordStrPath(initY,initX,endY,endX ...
     ,mRows,nCols,m2SDSNbrY,m2SDSNbrX,dY,dX);
 
@@ -233,28 +276,6 @@ xlabel('Distance From Divide [m]')
 ylabel('Elevation [m]')
 xlim([0 distFromInit(end)])
 ylim([min(elev),max(elev)])
-
-%% Calculate upstream cells number of all cells within every depression
-
-% A. Calculate the number of upstream cells out of flooded region
-nUpstreamCellsWithFldReg = CalcUpstreamCellsWithFldReg(DEM,targetDrainage ...
-    ,flood,m1SDSNbrY,m1SDSNbrX,fldRegID,nFldRegCells);
-
-% B. Calculate flow accumulation within each flooded region
-nUpstreamCells ...
-    = CalcUpstreamCellsInSubFldReg(subFldRegTree,mFlowDir_SubFldReg ...
-    ,mFlowDir_Saddle,fldRegID,nUpstreamCellsWithFldReg,fldRegInfo ...
-    ,m2SDSNbrY,m2SDSNbrX,subFldRegID,DEM,regionalMin);   
-
-% Visualization for the number of upstream cells
-figure(5);
-set(gcf,'Color',[1 1 1])
-% imagesc(log(nUpstreamCells(2:end-1,2:end-1)));
-imagesc(nUpstreamCellsWithFldReg(2:end-1,2:end-1));
-axis image
-set(gca,'YTick',[],'XTick' ,[])
-colormap(flipud(colormap(gray)))
-colorbar
 
 % % c. export the number of upstream cells for ArcGIS
 % nUpstreamCellsMap = nUpstreamCells;
