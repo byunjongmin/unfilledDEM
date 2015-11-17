@@ -472,33 +472,33 @@ for ithSink = 1:allSinksNo
             else % if isTrueOutlet == false
           
                 OUTLET_FOUNDED = false;
+                
+                % a. mark the type of outlet cand
+                if OUTLET_WET_NBR_FALSE_tf == true
+
+                    subFldRegOutlet(outletCandY,outletCandX) ...
+                        = OUTLET_WET_NBR_FALSE;
+                    % reset old flooded region outlet
+                    fldRegID(oldOutletIdx) = 0;
+
+
+                elseif SHARED_OUTLET_WET_NBR_FALSE_tf == true
+
+                    subFldRegOutlet(outletCandY,outletCandX) ...
+                        = SHARED_OUTLET_WET_NBR_FALSE;
+                    % reset old flooded region outlet
+                    fldRegID(oldOutletIdx) = 0;
+
+                elseif SHARED_OUTLET_SURROUNDED_HIGH_ELEV_tf == true
+
+                    subFldRegOutlet(outletCandY,outletCandX) ...
+                        = SHARED_OUTLET_SURROUNDED_HIGH_ELEV;
+
+                end
 
                 nOutConnectedSubFldReg = numel(outConnectedSubFldRegID);
                 for i=1:nOutConnectedSubFldReg
                     
-                    % a. mark the type of outlet cand
-                    if OUTLET_WET_NBR_FALSE_tf == true
-                        
-                        subFldRegOutlet(outletCandY,outletCandX) ...
-                            = OUTLET_WET_NBR_FALSE;
-                        % reset old flooded region outlet
-                        fldRegID(oldOutletIdx) = 0;
-
-                        
-                    elseif SHARED_OUTLET_WET_NBR_FALSE_tf == true
-                        
-                        subFldRegOutlet(outletCandY,outletCandX) ...
-                            = SHARED_OUTLET_WET_NBR_FALSE;
-                        % reset old flooded region outlet
-                        fldRegID(oldOutletIdx) = 0;
-                        
-                    elseif SHARED_OUTLET_SURROUNDED_HIGH_ELEV_tf == true
-                        
-                        subFldRegOutlet(outletCandY,outletCandX) ...
-                            = SHARED_OUTLET_SURROUNDED_HIGH_ELEV;
-                        
-                    end
-
                     % b. count the number of connected sub-flooded regions
                     sharedOutlet(outletCandY,outletCandX) ...
                         = sharedOutlet(outletCandY,outletCandX) + 1;
@@ -511,14 +511,14 @@ for ithSink = 1:allSinksNo
                         ,outletCandY,outletCandX];
                     
                     % d. add outlet connected flooded region cells
+                    tFldRegID = unique(fldRegID(subFldRegID == outConnectedSubFldRegID(i)));
+                    tmpIdx = find(fldRegID == tFldRegID(tFldRegID > 0));
                     [tmpY,tmpX] = ind2sub([mRows,nCols],tmpIdx);
                     crtFldRegCell.Y(nCrtFldRegCells+1:nCrtFldRegCells+numel(tmpIdx)) = tmpY;
                     crtFldRegCell.X(nCrtFldRegCells+1:nCrtFldRegCells+numel(tmpIdx)) = tmpX;
                     nCrtFldRegCells = nCrtFldRegCells + numel(tmpIdx);
 
                     % e. reset the ID of connected sub-flooded region
-                    tFldRegID = unique(fldRegID(subFldRegID == outConnectedSubFldRegID(i)));
-                    tmpIdx = find(fldRegID == tFldRegID(tFldRegID > 0));
                     flood(tmpIdx) = CURRENT_FLOODED;
 
                     % f. add the shared flooded region into the gone
