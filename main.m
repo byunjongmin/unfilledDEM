@@ -3,7 +3,7 @@ function main
 % @brief Function to extract stream longitudinal profiles from unfilled
 % DEMs
 %
-% @version 0.1.1. / 2015-11-16
+% @version 0.1.2. / 2015-11-16
 % @author Jongmin Byun
 %==========================================================================
 
@@ -23,28 +23,37 @@ dX = R.DeltaX;
 dY = -R.DeltaY;
 DEM = double(DEM);
 
-%% For debug for a part of DEM
-tYMin = 311; tYMax = 370;
-tXMin = 146; tXMax = 195;
-
-DEM = DEM(tYMin:tYMax,tXMin:tXMax);
-[mRows,nCols] = size(DEM);
-
 %% Define target drainage
-% Note that you should check the location of the outlet of the test domain.
-% It should be located on the boundary of a drainage. If it is within the
-% drainage, you should modify the DEM
 
-% % for the domain surrounded by null
-% nanMask = (DEM == 32767);
-% DEM(nanMask) = inf;
-% DEMArea = ~nanMask;
+IS_IT_PART = false;
 
-% for the domain filled with only elevations
-nanMask = true(mRows,nCols);
-nanMask(2:mRows-1,2:nCols-1) = false;
-DEMArea = ~nanMask;
-DEM(nanMask) = inf;
+if IS_IT_PART == true
+    
+    % For debug for a part of DEM
+    tYMin = 311; tYMax = 370;
+    tXMin = 145; tXMax = 195;
+
+    DEM = DEM(tYMin:tYMax,tXMin:tXMax);
+    [mRows,nCols] = size(DEM);
+    
+    % for the domain filled with only elevations
+    nanMask = true(mRows,nCols);
+    nanMask(2:mRows-1,2:nCols-1) = false;
+    DEMArea = ~nanMask;
+    DEM(nanMask) = inf;
+    
+else
+
+    % note that you should check the location of the outlet of the test domain.
+    % It should be located on the boundary of a drainage. If it is within the
+    % drainage, you should modify the DEM
+
+    % for the domain surrounded by null
+    nanMask = (DEM == 32767);
+    DEM(nanMask) = inf;
+    DEMArea = ~nanMask;
+
+end
 
 % extract the boundary of the target drainage
 s = strel('square',3); % structural element when eroding image
