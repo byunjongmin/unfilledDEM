@@ -1,6 +1,6 @@
-function [nUpstreamCells,markForGoneCells] ...
+function nUpstreamCells ...
     = mCalcUpstreamCells(nUpstreamCells,DEM,targetDrainage ...
-    ,m2SDSNbrY,m2SDSNbrX,iSubFldRegMap,markForGoneCells)
+    ,m2SDSNbrY,m2SDSNbrX,iSubFldRegMap)
 % @file mCalcUpstreamCells.m
 % @brief Calculate upstream cells of cells within a sub flooded region
 %
@@ -17,12 +17,9 @@ function [nUpstreamCells,markForGoneCells] ...
 % @retval nUpstreamCells
 % @retval markForGoneCells
 %
-% @version 2.0.2 / 2015-11-14
+% @version 2.0.3 / 2015-11-18
 % @author Jongmin Byun
 %==========================================================================
-
-% constants
-GONE_WSD = 4;
 
 % sort cells according to sub-flooded region ID, elevation
 [vtY,vtX] = find(targetDrainage); % vector Y, vector X

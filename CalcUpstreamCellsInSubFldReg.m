@@ -1,6 +1,6 @@
 function nUpstreamCells ...
     = CalcUpstreamCellsInSubFldReg(root,mFlowDir_SubFldReg ...
-    ,fldRegID,nUpstreamCells,fldRegInfo ...
+    ,fldRegID,tmpNUpstreamCells,fldRegInfo ...
     ,m2SDSNbrY,m2SDSNbrX,subFldRegID,DEM,regionalMin)
 % @file CalcUpstreamCellsInSubFldReg.m
 % @brief Calculate the number of upstream cells of cells in each flooded
@@ -9,7 +9,7 @@ function nUpstreamCells ...
 % @param[in] root
 % @param[in] mFlowDirMap
 % @param[in] fldRegID
-% @param[in] nUpstreamCells
+% @param[in] tmpNUpstreamCells: calculated by CalcUpstreamCellsWithFldReg
 % @param[in] fldRegInfo
 % @param[in] m2SDSNbrY
 % @param[in] m2SDSNbrX
@@ -21,14 +21,13 @@ function nUpstreamCells ...
 % @param[in] nFlatRegCells
 % @retval nUpstreamCells
 %
-% @version 2.1.1 / 2015-11-18
+% @version 2.1.2 / 2015-11-18
 %
 % @author Jongmin Byun
 %==========================================================================
 % constant
 FROM_REGMIN_TO_UP = 2;
 FROM_TARWSD_TO_TARWSD = 3;
-GONE_WSD = 4;
 [mRows,nCols] = size(DEM);
 
 % variables
@@ -38,14 +37,13 @@ treeDepth = root.depthtree; % coordinated tree where each node holds its depth
 nChildNode = tree(root,0); % copy-constructor for the root tree. a tree for the number of children nodes
 nChildNode2 = tree(root,0); % a tree for the number of children nodes to be processed
 
-nUpstreamCells(fldRegID > 0) = 0; % mask for current sub-flooded region, reset upstream cells numbers for flooded regions
-prevNUpstreamCells = nUpstreamCells; % for whole region
+tmpNUpstreamCells(fldRegID > 0) = 0; % reset upstream cells numbers for flooded regions. used as temporary values
+nUpstreamCells = tmpNUpstreamCells; % output variable
 
-doNotAccFlowMask = ... % cells not to be processed for the first time in mCalcUpstreamCells function
+notAccFlow = ... % cells not to be processed in mCalcUpstreamCells function
     mFlowDir_SubFldReg == FROM_TARWSD_TO_TARWSD ...
     | mFlowDir_SubFldReg == FROM_REGMIN_TO_UP;
-markForGoneCells = nan(mRows,nCols); % to mark trace
-markForGoneCells(doNotAccFlowMask) = mFlowDir_SubFldReg(doNotAccFlowMask);
+markForGoneCells = false(mRows,nCols); % to mark trace
 
 nFldReg = numel(fldRegInfo(:,1));
 for i = 1:nFldReg
@@ -106,22 +104,22 @@ for i = 1:nFldReg
             dIthSubFldRegMap ... % dilated current sub flooded region map
                 = imdilate(iSubFldRegMap,s);
             
-            % define the area for calculating the number of upstream cells
-            % over the current sub-flooded region
-            % Note: avoid flow direction modified cells
+            % a. define the area for calculating the number of upstream
+            % cells over the current sub-flooded region
+            % note: avoid flow direction modified cells and the already
+            % gone cells
             targetDrainage = ~isnan(DEM) ...
                 & dIthSubFldRegMap ...
-                & ~doNotAccFlowMask ...
-                & (markForGoneCells ~= GONE_WSD);
-                    
-            nUpstreamCells = prevNUpstreamCells;
-            % calculate the number of upstream cells over chosen area
-            [nUpstreamCells,markForGoneCells] ...
-                = mCalcUpstreamCells(nUpstreamCells,DEM ...
-                ,targetDrainage,m2SDSNbrY,m2SDSNbrX ...
-                ,iSubFldRegMap,markForGoneCells);
+                & (notAccFlow == false)...
+                & (markForGoneCells == false);
+                
+            % b. calculate the number of upstream cells over chosen area
+            tmpNUpstreamCells = nUpstreamCells;
+            tmpNUpstreamCells ...
+                = mCalcUpstreamCells(tmpNUpstreamCells,DEM ...
+                ,targetDrainage,m2SDSNbrY,m2SDSNbrX,iSubFldRegMap);
             
-            % calculate upstream cells number for the remainder:
+            % c. calculate upstream cells number for the remainder:
             % from the regional minima to its outlet
             
             % Identify the regional minima in the sub-flooded region
@@ -136,19 +134,23 @@ for i = 1:nFldReg
                 if iSubFldRegMap(downStreamY,downStreamX) == true
                 
                     % add one for itself
-                    nUpstreamCells(downStreamY,downStreamX) ...
-                        = nUpstreamCells(downStreamY,downStreamX) + 1;
+                    tmpNUpstreamCells(downStreamY,downStreamX) ...
+                        = tmpNUpstreamCells(downStreamY,downStreamX) + 1;
 
                     % transfer downstream cell's upstream cells number to
                     % upstream cell
                     upStreamY = m2SDSNbrY(downStreamY,downStreamX);
                     upStreamX = m2SDSNbrX(downStreamY,downStreamX);
-                    nUpstreamCells(upStreamY,upStreamX) ...
-                        = nUpstreamCells(upStreamY,upStreamX) ...
-                            + nUpstreamCells(downStreamY,downStreamX);
+                    
+                    if fldRegID(upStreamY,upStreamX) >= 0
+                        % if upstream cell is not true outlet
+                        tmpNUpstreamCells(upStreamY,upStreamX) ...
+                            = tmpNUpstreamCells(upStreamY,upStreamX) ...
+                                + tmpNUpstreamCells(downStreamY,downStreamX);
+                    end
                     
                     % mark
-                    markForGoneCells(downStreamY,downStreamX) = GONE_WSD;
+                    markForGoneCells(downStreamY,downStreamX) = true;
                     
                     % move upstream
                     downStreamY = upStreamY;
@@ -164,7 +166,7 @@ for i = 1:nFldReg
             end % while pathBNotDeon
                         
             % update upstream cells number for the current flooded region
-            prevNUpstreamCells(iSubFldRegMap) = nUpstreamCells(iSubFldRegMap);
+            nUpstreamCells(iSubFldRegMap) = tmpNUpstreamCells(iSubFldRegMap);
             
             % remove one node from the remaining children nodes
             parentID = nChildNode.getparent(childID);
