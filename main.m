@@ -134,8 +134,8 @@ IS_IT_PART = true;
 if IS_IT_PART == true
     
     % For debug for a part of DEM
-    tYMin = 301; tYMax = 330;
-    tXMin = 165; tXMax = 205;
+    tYMin = 743; tYMax = 793;
+    tXMin = 212; tXMax = 260;
 
     DEM = DEM(tYMin:tYMax,tXMin:tXMax);
     [mRows,nCols] = size(DEM);
@@ -244,7 +244,7 @@ title('Sub-flooded Region Outlet');
 %% Modify flow direction of the cells within each depression
 
 % Assign flow direction to the cells in each depression region
-[m2SDSNbrY,m2SDSNbrX ... % modified for flooded region's outlet
+[m2SDSNbrY,m2SDSNbrX ... % flow direction modified cells along the path to each regional minima
 ,mFlowDir_SubFldReg ... % flow direction modified cell within a sub-flooded region 
 ,mFlowDir_Saddle ... % flow direction modified cell on a saddle
 ,subFldRegTree ...

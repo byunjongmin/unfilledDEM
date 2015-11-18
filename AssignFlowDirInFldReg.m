@@ -7,7 +7,8 @@ function [m2SDSNbrY,m2SDSNbrX,mFlowDir_SubFldReg,mFlowDir_Saddle ...
 % flooded region to link an anther regional minima in next sub flooded
 % region
 %
-% @param(in] m2SDSNbrY
+% @param(in] m2SDSNbrY: modified flow direction cells along the path to
+%                       each regional minima
 % @param[in) m2SDSNbrX
 % @param[in] SDSFlowDirection
 % @param[in] subFldRegOutInfo
