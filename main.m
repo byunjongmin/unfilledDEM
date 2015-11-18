@@ -3,7 +3,7 @@ function main
 % @brief Function to extract stream longitudinal profiles from unfilled
 % DEMs
 %
-% @version 0.1.4. / 2015-11-18
+% @version 0.1.5. / 2015-11-18
 % @author Jongmin Byun
 %==========================================================================
 
@@ -264,7 +264,7 @@ nUpstreamCellsWithFldReg = CalcUpstreamCellsWithFldReg(DEM,targetDrainage ...
 % B. Calculate flow accumulation within each flooded region
 nUpstreamCells ...
     = CalcUpstreamCellsInSubFldReg(subFldRegTree,mFlowDir_SubFldReg ...
-    ,mFlowDir_Saddle,fldRegID,nUpstreamCellsWithFldReg,fldRegInfo ...
+    ,fldRegID,nUpstreamCellsWithFldReg,fldRegInfo ...
     ,m2SDSNbrY,m2SDSNbrX,subFldRegID,DEM,regionalMin);   
 
 % Visualization for the number of upstream cells

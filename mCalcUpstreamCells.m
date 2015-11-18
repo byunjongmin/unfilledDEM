@@ -17,7 +17,7 @@ function [nUpstreamCells,markForGoneCells] ...
 % @retval nUpstreamCells
 % @retval markForGoneCells
 %
-% @version 2.0.1 / 2015-11-14
+% @version 2.0.2 / 2015-11-14
 % @author Jongmin Byun
 %==========================================================================
 
@@ -46,8 +46,7 @@ for i = 1:nTotalCells
 
         nUpstreamCells(iCellY,iCellX) ...
             = nUpstreamCells(iCellY,iCellX) + 1;
-        % add the current sub-flooded region to the exception list
-        markForGoneCells(iCellY,iCellX) = GONE_WSD;        
+     
     end
     
     dStreamNbrY = m2SDSNbrY(iCellY,iCellX); % down stream neighbour Y

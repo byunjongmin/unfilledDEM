@@ -1,6 +1,6 @@
 function nUpstreamCells ...
     = CalcUpstreamCellsInSubFldReg(root,mFlowDir_SubFldReg ...
-    ,mFlowDir_Saddle,fldRegID,nUpstreamCells,fldRegInfo ...
+    ,fldRegID,nUpstreamCells,fldRegInfo ...
     ,m2SDSNbrY,m2SDSNbrX,subFldRegID,DEM,regionalMin)
 % @file CalcUpstreamCellsInSubFldReg.m
 % @brief Calculate the number of upstream cells of cells in each flooded
@@ -21,12 +21,11 @@ function nUpstreamCells ...
 % @param[in] nFlatRegCells
 % @retval nUpstreamCells
 %
-% @version 2.1.0 / 2015-11-18
+% @version 2.1.1 / 2015-11-18
 %
 % @author Jongmin Byun
 %==========================================================================
 % constant
-NOT_MODIFIED = 0;
 FROM_REGMIN_TO_UP = 2;
 FROM_TARWSD_TO_TARWSD = 3;
 GONE_WSD = 4;
@@ -112,8 +111,8 @@ for i = 1:nFldReg
             % Note: avoid flow direction modified cells
             targetDrainage = ~isnan(DEM) ...
                 & dIthSubFldRegMap ...
-                & (markForGoneCells ~= FROM_REGMIN_TO_UP ... % flow direction modified cell
-                    & markForGoneCells ~= FROM_TARWSD_TO_TARWSD);
+                & ~doNotAccFlowMask ...
+                & (markForGoneCells ~= GONE_WSD);
                     
             nUpstreamCells = prevNUpstreamCells;
             % calculate the number of upstream cells over chosen area
@@ -134,44 +133,38 @@ for i = 1:nFldReg
             pathBNotDone = true;
             while pathBNotDone
             
-                % add one for itself
-                if markForGoneCells(downStreamY,downStreamX) ...
-                        ~= GONE_WSD % avoid the flat already calculated
+                if iSubFldRegMap(downStreamY,downStreamX) == true
+                
+                    % add one for itself
                     nUpstreamCells(downStreamY,downStreamX) ...
                         = nUpstreamCells(downStreamY,downStreamX) + 1;
-                end
-                
-                upStreamNbrY = m2SDSNbrY(downStreamY,downStreamX);
-                upStreamNbrX = m2SDSNbrX(downStreamY,downStreamX);
 
-                if dIthSubFldRegMap(upStreamNbrY,upStreamNbrX) == true
-                    
-                    if markForGoneCells(downStreamY,downStreamX) ...
-                            ~= GONE_WSD % avoid the flat already calculated
-                        
-                        markForGoneCells(downStreamY,downStreamX) = GONE_WSD;
-                        % transfer upstream cells number to the downstream cell
-                        
-                        nUpstreamCells(upStreamNbrY,upStreamNbrX) ...
-                            = nUpstreamCells(upStreamNbrY,upStreamNbrX) ...
+                    % transfer downstream cell's upstream cells number to
+                    % upstream cell
+                    upStreamY = m2SDSNbrY(downStreamY,downStreamX);
+                    upStreamX = m2SDSNbrX(downStreamY,downStreamX);
+                    nUpstreamCells(upStreamY,upStreamX) ...
+                        = nUpstreamCells(upStreamY,upStreamX) ...
                             + nUpstreamCells(downStreamY,downStreamX);
-                        
-                    end
                     
-                    downStreamY = upStreamNbrY;
-                    downStreamX = upStreamNbrX;
+                    % mark
+                    markForGoneCells(downStreamY,downStreamX) = GONE_WSD;
                     
-                else
+                    % move upstream
+                    downStreamY = upStreamY;
+                    downStreamX = upStreamX;
+
+                else % iSubFldRegMap(downStreamY,downStreamX) == false
 
                     pathBNotDone = false;
-                    markForGoneCells(downStreamY,downStreamX) = GONE_WSD;
-                     
+                    iSubFldRegMap(upStreamY,upStreamX) = true;
+
                 end % if iSubFldRegMap
+                
             end % while pathBNotDeon
                         
             % update upstream cells number for the current flooded region
-            prevNUpstreamCells(dIthSubFldRegMap) ...
-                = nUpstreamCells(dIthSubFldRegMap);
+            prevNUpstreamCells(iSubFldRegMap) = nUpstreamCells(iSubFldRegMap);
             
             % remove one node from the remaining children nodes
             parentID = nChildNode.getparent(childID);
