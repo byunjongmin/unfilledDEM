@@ -3,7 +3,7 @@ function main
 % @brief Function to extract stream longitudinal profiles from unfilled
 % DEMs
 %
-% @version 0.1.2. / 2015-11-16
+% @version 0.1.4. / 2015-11-18
 % @author Jongmin Byun
 %==========================================================================
 
@@ -25,35 +25,14 @@ DEM = double(DEM);
 
 %% Define target drainage
 
-IS_IT_PART = false;
+% for the domain surrounded by null
+nanMask = (DEM == 32767);
+DEM(nanMask) = inf;
+DEMArea = ~nanMask;
 
-if IS_IT_PART == true
-    
-    % For debug for a part of DEM
-    tYMin = 311; tYMax = 370;
-    tXMin = 145; tXMax = 195;
-
-    DEM = DEM(tYMin:tYMax,tXMin:tXMax);
-    [mRows,nCols] = size(DEM);
-    
-    % for the domain filled with only elevations
-    nanMask = true(mRows,nCols);
-    nanMask(2:mRows-1,2:nCols-1) = false;
-    DEMArea = ~nanMask;
-    DEM(nanMask) = inf;
-    
-else
-
-    % note that you should check the location of the outlet of the test domain.
-    % It should be located on the boundary of a drainage. If it is within the
-    % drainage, you should modify the DEM
-
-    % for the domain surrounded by null
-    nanMask = (DEM == 32767);
-    DEM(nanMask) = inf;
-    DEMArea = ~nanMask;
-
-end
+% note that you should check the location of the outlet of the test domain.
+% It should be located on the boundary of a drainage. If it is within the
+% drainage, you should modify the DEM
 
 % extract the boundary of the target drainage
 s = strel('square',3); % structural element when eroding image
@@ -131,12 +110,6 @@ set(gca,'DataAspectRatio',[1 1 1]);
 colorbar;
 title('Difference in Elevation after Smoothing');
 
-% %% For debug for a whole DEM
-% INPUT_DIR = '../data/input';
-% dataFileName = 'b_PSink_2015-09-15.mat';
-% dataFilePath = fullfile(INPUT_DIR,dataFileName);
-% load(dataFilePath);
-
 %% Remove isolated area
 
 DEM_BW = false(mRows,nCols); % binary of DEM
@@ -145,6 +118,65 @@ CC = bwconncomp(DEM_BW); % identify connected components of valid cells
 if CC.NumObjects > 1
     DEM(CC.PixelIdxList{2:end}) = inf; % remove the connected components except for the target area
     targetDrainage(CC.PixelIdxList{2:end}) = false;
+end
+
+%% for debug
+
+% For debug
+clear all
+INPUT_DIR = '../data/input';
+dataFileName = 'b_IS_IT_PART_2015-11-18.mat';
+dataFilePath = fullfile(INPUT_DIR,dataFileName);
+load(dataFilePath);
+
+IS_IT_PART = true;
+
+if IS_IT_PART == true
+    
+    % For debug for a part of DEM
+    tYMin = 301; tYMax = 330;
+    tXMin = 165; tXMax = 205;
+
+    DEM = DEM(tYMin:tYMax,tXMin:tXMax);
+    [mRows,nCols] = size(DEM);
+    
+    % for the domain filled with only elevations
+    nanMask = true(mRows,nCols);
+    nanMask(2:mRows-1,2:nCols-1) = false;
+    DEMArea = ~nanMask;
+    DEM(nanMask) = inf;
+    
+    % extract the boundary of the target drainage
+    s = strel('square',3); % structural element when eroding image
+    eDEMArea = imerode(DEMArea,s); 
+    DEMAreaBnd = DEMArea & ~eDEMArea;
+    DEMAreaBndIdx = find(DEMAreaBnd);
+
+    % identify the coordinate of the outlet
+    DEMAreaBndElev = DEM(DEMAreaBndIdx);
+    [~,minElevIdx] = min(DEMAreaBndElev);
+    outletIdx = DEMAreaBndIdx(minElevIdx); % outlet on the boundary of drainage
+    [outletY,outletX] = ind2sub([mRows,nCols],outletIdx);
+
+    % Note that the elevation of the main outlet should be the lowest.
+    DEM(outletY,outletX) = min(DEM(:)) - 0.1;
+
+    % define target drainage
+    targetDrainage = (~nanMask);
+    targetDrainage(outletY,outletX) = false;
+    
+    [steepestDescentSlope,slopeAllNbr,SDSFlowDirection,SDSNbrY,SDSNbrX] ...
+        = CalcSDSFlow(DEM,dX,dY);
+    % flatRegMap = ProcessFlat(DEM,targetDrainage,slopeAllNbr);
+    
+    % for debug
+    figure(2);
+
+    imagesc(DEM);
+    set(gca,'DataAspectRatio',[1 1 1]);
+    colorbar;
+    title('Digital Elevation Model');
+    
 end
 
 %% Identify depressions and their outlets, then modify each depression
@@ -173,7 +205,7 @@ end
 % load(dataFilePath);
     
 % frequency distribution of the types of sub-flooded region's outlet
-figure(2); clf;
+figure(3); clf;
 set(gcf, 'Color',[1,1,1]);
 h = histogram(subFldRegOutlet(subFldRegOutlet > 0));
 xlabel('Type of Sub-flooded Region Outlet');
@@ -183,7 +215,7 @@ grid on
 % set boundary
 fXMin = 1; fXMax = nCols;
 fYMin = 1; fYMax = mRows;
-figure(3)
+figure(4)
 
 subplot(2,2,1)
 imagesc(DEM(fYMin:fYMax,fXMin:fXMax));
@@ -266,8 +298,8 @@ colorbar
 %% draw a stream longitudinal profile on the interesting stream path
 
 % record stream path using the input initial and end point coordinates
-initY = 22; initX = 39;
-endY = 29; endX = 46;
+initY = 2; initX = 3;
+endY = outletY; endX = outletX;
 [streamPath,distFromInit] = RecordStrPath(initY,initX,endY,endX ...
     ,mRows,nCols,m2SDSNbrY,m2SDSNbrX,dY,dX);
 

@@ -239,7 +239,7 @@ for ithSink = 1:allSinksNo
                         oldOutletX = m1SDSNbrX(outletCandNbrIdx);
                         oldOutletIdx = sub2ind([mRows,nCols],oldOutletY,oldOutletX);
                         
-                        if DEM(oldOutletIdx) ~= DEM(outletCandNbrIdx)
+                        if DEM(oldOutletIdx) ~= DEM(outletCandIdx)
                         
                         
                             if slopeAllNbr(outletCandY,outletCandX,j) ...
