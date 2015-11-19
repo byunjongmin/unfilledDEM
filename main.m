@@ -3,7 +3,7 @@ function main
 % @brief Function to extract stream longitudinal profiles from unfilled
 % DEMs
 %
-% @version 0.1.5. / 2015-11-18
+% @version 0.2.0. / 2015-11-19
 % @author Jongmin Byun
 %==========================================================================
 
@@ -12,15 +12,16 @@ function main
 % Constants
 INPUT_DIR = '../data/input';
 OUTPUT_DIR = '../data/output';
-DEMFileName = 'tareaR50m.tif';
+DEMFileName = 'n37_e128_1arc_v3';
 DEMFilePath = fullfile(INPUT_DIR,DEMFileName);
 [DEM,R] = geotiffread(DEMFilePath);
 
 % DEM basic properties
 mRows = R.RasterSize(1,1);
 nCols = R.RasterSize(1,2);
-dX = R.DeltaX;
-dY = -R.DeltaY;
+% dX = R.DeltaX;
+% dY = -R.DeltaY;
+dX = 30; dY = 30; % meter
 DEM = double(DEM);
 
 %% Define target drainage
@@ -88,7 +89,7 @@ while afterNFlat > 0
     
     oldNFlat = afterNFlat;
     afterNFlat = numel(find(flatRegMap == true));
-    if oldNFlat == afterNFlat
+    if oldNFlat >= afterNFlat
         rT = rT + 1;
     else
         rT = 0;
@@ -116,20 +117,21 @@ DEM_BW = false(mRows,nCols); % binary of DEM
 DEM_BW(~isinf(DEM)) = true;
 CC = bwconncomp(DEM_BW); % identify connected components of valid cells
 if CC.NumObjects > 1
-    DEM(CC.PixelIdxList{2:end}) = inf; % remove the connected components except for the target area
+    DEM(CC.PixelIdxList{2:5}) = inf; % remove the connected components except for the target area
     targetDrainage(CC.PixelIdxList{2:end}) = false;
 end
 
 %% for debug
 
-% For debug
-clear all
-INPUT_DIR = '../data/input';
-dataFileName = 'b_IS_IT_PART_2015-11-18.mat';
-dataFilePath = fullfile(INPUT_DIR,dataFileName);
-load(dataFilePath);
+% % For debug
+% clear all
+% INPUT_DIR = '../data/input';
+% dataFileName = 'b_IS_IT_PART_2015-11-18.mat';
+% dataFilePath = fullfile(INPUT_DIR,dataFileName);
+% load(dataFilePath);
 
-IS_IT_PART = true;
+IS_IT_PART = false;
+IS_BND_INF = false;
 
 if IS_IT_PART == true
     
@@ -140,30 +142,47 @@ if IS_IT_PART == true
     DEM = DEM(tYMin:tYMax,tXMin:tXMax);
     [mRows,nCols] = size(DEM);
     
-    % for the domain filled with only elevations
-    nanMask = true(mRows,nCols);
-    nanMask(2:mRows-1,2:nCols-1) = false;
-    DEMArea = ~nanMask;
-    DEM(nanMask) = inf;
+
     
-    % extract the boundary of the target drainage
-    s = strel('square',3); % structural element when eroding image
-    eDEMArea = imerode(DEMArea,s); 
-    DEMAreaBnd = DEMArea & ~eDEMArea;
-    DEMAreaBndIdx = find(DEMAreaBnd);
+    if IS_BND_INF == true
+        
+        % for the domain filled with only elevations
+        nanMask = true(mRows,nCols);
+        nanMask(2:mRows-1,2:nCols-1) = false;
+        DEMArea = ~nanMask;
+        DEM(nanMask) = inf;
 
-    % identify the coordinate of the outlet
-    DEMAreaBndElev = DEM(DEMAreaBndIdx);
-    [~,minElevIdx] = min(DEMAreaBndElev);
-    outletIdx = DEMAreaBndIdx(minElevIdx); % outlet on the boundary of drainage
-    [outletY,outletX] = ind2sub([mRows,nCols],outletIdx);
+        % extract the boundary of the target drainage
+        s = strel('square',3); % structural element when eroding image
+        eDEMArea = imerode(DEMArea,s); 
+        DEMAreaBnd = DEMArea & ~eDEMArea;
+        DEMAreaBndIdx = find(DEMAreaBnd);
 
-    % Note that the elevation of the main outlet should be the lowest.
-    DEM(outletY,outletX) = min(DEM(:)) - 0.1;
+        % identify the coordinate of the outlet
+        DEMAreaBndElev = DEM(DEMAreaBndIdx);
+        [~,minElevIdx] = min(DEMAreaBndElev);
+        outletIdx = DEMAreaBndIdx(minElevIdx); % outlet on the boundary of drainage
+        [outletY,outletX] = ind2sub([mRows,nCols],outletIdx);
 
-    % define target drainage
-    targetDrainage = (~nanMask);
-    targetDrainage(outletY,outletX) = false;
+        % Note that the elevation of the main outlet should be the lowest.
+        DEM(outletY,outletX) = min(DEM(:)) - 0.1;
+        
+        % define target drainage
+        targetDrainage = (~nanMask);
+        targetDrainage(outletY,outletX) = false;
+        
+    else
+        
+        % for the domain filled with only elevations
+        nanMask = true(mRows,nCols);
+        nanMask(2:mRows-1,2:nCols-1) = false;
+        DEMArea = ~nanMask;
+        DEM(nanMask) = 0;
+        
+        % define target drainage
+        targetDrainage = (~nanMask);
+        
+    end
     
     [steepestDescentSlope,slopeAllNbr,SDSFlowDirection,SDSNbrY,SDSNbrX] ...
         = CalcSDSFlow(DEM,dX,dY);
@@ -295,11 +314,19 @@ set(gca,'YTick',[],'XTick' ,[])
 colormap(flipud(colormap(gray)))
 colorbar
 
+figure(6)
+set(gcf,'Color',[1 1 1])
+imagesc(nUpstreamCells(2:end-1,2:end-1));
+title('Upstream Cells No.');
+axis image
+set(gca,'YTick',[],'XTick' ,[])
+colormap(flipud(colormap(gray)))
+colorbar
 %% draw a stream longitudinal profile on the interesting stream path
 
 % record stream path using the input initial and end point coordinates
-initY = 2; initX = 3;
-endY = outletY; endX = outletX;
+initY = 617; initX = 719;
+endY = 852; endX = 299;
 [streamPath,distFromInit] = RecordStrPath(initY,initX,endY,endX ...
     ,mRows,nCols,m2SDSNbrY,m2SDSNbrX,dY,dX);
 
@@ -307,7 +334,7 @@ endY = outletY; endX = outletX;
 elev = DEM(streamPath(:));
 
 % draw figure
-figure(4); clf;
+figure(7); clf;
 set(gcf, 'Color',[1,1,1]);
 stairs(distFromInit,elev);
 
@@ -318,10 +345,144 @@ ylabel('Elevation [m]')
 xlim([0 distFromInit(end)])
 ylim([min(elev),max(elev)])
 
-% % c. export the number of upstream cells for ArcGIS
-% nUpstreamCellsMap = nUpstreamCells;
-% tFilePath = fullfile(OUTPUT_DIR,'nUpstreamCellsMap');
-% ExportRasterAsArcGrid(tFilePath,nUpstreamCellsMap,dY,xllcorner(1),yllcorner(1));
+%% Smoothing stream profiles
+
+% Considering neighbours number
+
+% note that, in this procedure, you should find the range affected by
+% blocks along chosen stream paths
+nCells = numel(streamPath);
+considerNbrForElev = 150; % number of considering neighbor cells
+nCNbr = numel(considerNbrForElev); % when you compare the difference due to the number of considering neighbor cells
+
+smoothedElev = SmoothingElev(considerNbrForElev,distFromInit,DEM,streamPath);
+
+figure(8); clf;
+set(gcf, 'Color',[1,1,1]);
+
+cc = jet(nCNbr);
+for ithLine = 1:nCNbr
+    plot(distFromInit,smoothedElev(:,ithLine),'color',cc(ithLine,:));
+    hold on
+end
+
+grid on
+title('Longitudinal Stream Profile')
+xlabel('Distance From Divide [m]')
+ylabel('Elevation [m]')
+xlim([0 distFromInit(end)])
+ylim([min(elev),max(elev)])
+
+
+%% Export distance from divide map to ArcGIS to know the location
+
+fileName = strcat(num2str(initY),'_',num2str(initX),'_',num2str(endY),'_',num2str(endX),'.asc');
+intPathDistFromDivideMap = nan(mRows,nCols);
+for ithCell = 1:nCells
+    intPathDistFromDivideMap(streamPath(ithCell)) = distFromInit(ithCell);    
+end
+IPDFDFilePath = fullfile(OUTPUT_DIR,fileName);
+ExportRasterAsArcGrid(IPDFDFilePath,intPathDistFromDivideMap,R.DeltaX ...
+    ,R.XLimWorld(1,1),R.YLimWorld(1,1));
+
+
+%% B. Draw slope
+considerNbrForSlope = 45;
+chosenSizeForSlope = 1;
+nCNbrForSlope = numel(considerNbrForSlope);
+
+slopePerDist = CalcSlope(considerNbrForSlope,distFromInit,smoothedElev ...
+    ,chosenSizeForSlope);
+
+figure(9); clf;
+set(gcf, 'Color',[1,1,1]);
+
+cc = jet(nCNbrForSlope);
+for ithLine = 1:nCNbrForSlope
+    plot(distFromInit,slopePerDist(:,ithLine),'color',cc(ithLine,:));
+    hold on
+end
+
+grid on
+xlabel('Distance From Initiaion [m]')
+ylabel('Slope')
+xlim([0 distFromInit(end)])
+ylim([min(slopePerDist(:,1)),max(slopePerDist(:,1))])
+
+%% Export distance from divide map to ArcGIS to know the location
+
+fileName = strcat(num2str(initY),'_',num2str(initX),'_',num2str(endY),'_',num2str(endX),'.asc');
+intPathDistFromDivideMap = nan(mRows,nCols);
+for ithCell = 1:nCells
+    intPathDistFromDivideMap(streamPath(ithCell)) = distFromInit(ithCell);    
+end
+IPDFDFilePath = fullfile(OUTPUT_DIR,fileName);
+ExportRasterAsArcGrid(IPDFDFilePath,intPathDistFromDivideMap,R.DeltaX ...
+    ,R.XLimWorld(1,1),R.YLimWorld(1,1));
+
+
+%% C. Draw corrected upstream area profiles on the interesting stream paths
+
+chosenSlopeForUpArea_Slope = 1;
+
+upstreamAreaProf = nUpstreamCells(streamPath(:)) .* dX .* dY;
+
+% a. Correction of upstream area prof
+prevUpArea = upstreamAreaProf(1);
+initUpArea = inf;
+isInitFirst = true;
+
+for ithCell = 2:nCells
+    
+    if upstreamAreaProf(ithCell) < prevUpArea
+        
+        if isInitFirst == true
+        
+            initUpArea = prevUpArea;
+            isInitFirst = false;
+            
+        end
+        
+        upstreamAreaProf(ithCell) = initUpArea;        
+        
+    end
+    
+    if upstreamAreaProf(ithCell) > initUpArea
+        
+        isInitFirst = true;
+        
+    end       
+    
+    prevUpArea = upstreamAreaProf(ithCell);
+
+end
+
+figure(10); clf;
+set(gcf, 'Color',[1,1,1]);
+
+subplot(2,1,1)
+plot(distFromInit,upstreamAreaProf);
+
+set(gca,'YScale','log');
+grid on
+title('Upstream Area Profile')
+xlabel('Distance From Divide [m]')
+ylabel('Upstream Area [m^2]')
+xlim([0 distFromInit(end)])
+ylim([min(upstreamAreaProf),max(upstreamAreaProf)])
+
+% D. Draw upslope area - slope relationship
+
+subplot(2,1,2)
+scatter(upstreamAreaProf,slopePerDist(:,chosenSlopeForUpArea_Slope) ...
+    ,'Marker','*');
+
+set(gca,'XScale','log','YScale','log');
+grid off
+title('Upstream Area - Slope')
+xlabel('Upstream Area [m^2]')
+ylabel('Slope')
+xlim([upstreamAreaProf(1),upstreamAreaProf(end)])
 
 %% Make stream network
 % 유역면적이 일정면적 이상인 셀을 하천으로 정의함
