@@ -3,7 +3,7 @@ function main
 % @brief Function to extract stream longitudinal profiles from unfilled
 % DEMs
 %
-% @version 0.2.0. / 2015-11-19
+% @version 0.2.1. / 2015-11-19
 % @author Jongmin Byun
 %==========================================================================
 
@@ -322,9 +322,12 @@ axis image
 set(gca,'YTick',[],'XTick' ,[])
 colormap(flipud(colormap(gray)))
 colorbar
+
+%% extract and analyze stream longitudinal profiles
+
 %% draw a stream longitudinal profile on the interesting stream path
 
-% record stream path using the input initial and end point coordinates
+% identify stream path using given initial and end point coordinates
 initY = 617; initX = 719;
 endY = 852; endX = 299;
 [streamPath,distFromInit] = RecordStrPath(initY,initX,endY,endX ...
@@ -345,15 +348,12 @@ ylabel('Elevation [m]')
 xlim([0 distFromInit(end)])
 ylim([min(elev),max(elev)])
 
-%% Smoothing stream profiles
+%% smoothing stream profiles
 
-% Considering neighbours number
-
-% note that, in this procedure, you should find the range affected by
-% blocks along chosen stream paths
-nCells = numel(streamPath);
 considerNbrForElev = 150; % number of considering neighbor cells
-nCNbr = numel(considerNbrForElev); % when you compare the difference due to the number of considering neighbor cells
+% note that you can compare the differences due to the number of
+% considering neighbor cells
+nCNbr = numel(considerNbrForElev); % number of cases
 
 smoothedElev = SmoothingElev(considerNbrForElev,distFromInit,DEM,streamPath);
 
@@ -373,20 +373,8 @@ ylabel('Elevation [m]')
 xlim([0 distFromInit(end)])
 ylim([min(elev),max(elev)])
 
+%% draw stream gradient
 
-%% Export distance from divide map to ArcGIS to know the location
-
-fileName = strcat(num2str(initY),'_',num2str(initX),'_',num2str(endY),'_',num2str(endX),'.asc');
-intPathDistFromDivideMap = nan(mRows,nCols);
-for ithCell = 1:nCells
-    intPathDistFromDivideMap(streamPath(ithCell)) = distFromInit(ithCell);    
-end
-IPDFDFilePath = fullfile(OUTPUT_DIR,fileName);
-ExportRasterAsArcGrid(IPDFDFilePath,intPathDistFromDivideMap,R.DeltaX ...
-    ,R.XLimWorld(1,1),R.YLimWorld(1,1));
-
-
-%% B. Draw slope
 considerNbrForSlope = 45;
 chosenSizeForSlope = 1;
 nCNbrForSlope = numel(considerNbrForSlope);
@@ -409,25 +397,15 @@ ylabel('Slope')
 xlim([0 distFromInit(end)])
 ylim([min(slopePerDist(:,1)),max(slopePerDist(:,1))])
 
-%% Export distance from divide map to ArcGIS to know the location
+%% draw corrected upstream area profiles on the interesting stream paths
 
-fileName = strcat(num2str(initY),'_',num2str(initX),'_',num2str(endY),'_',num2str(endX),'.asc');
-intPathDistFromDivideMap = nan(mRows,nCols);
-for ithCell = 1:nCells
-    intPathDistFromDivideMap(streamPath(ithCell)) = distFromInit(ithCell);    
-end
-IPDFDFilePath = fullfile(OUTPUT_DIR,fileName);
-ExportRasterAsArcGrid(IPDFDFilePath,intPathDistFromDivideMap,R.DeltaX ...
-    ,R.XLimWorld(1,1),R.YLimWorld(1,1));
-
-
-%% C. Draw corrected upstream area profiles on the interesting stream paths
-
+% choose a stream gradient profile
 chosenSlopeForUpArea_Slope = 1;
 
+% calculate upstream area
 upstreamAreaProf = nUpstreamCells(streamPath(:)) .* dX .* dY;
 
-% a. Correction of upstream area prof
+% correction of upstream area prof
 prevUpArea = upstreamAreaProf(1);
 initUpArea = inf;
 isInitFirst = true;
@@ -471,7 +449,7 @@ ylabel('Upstream Area [m^2]')
 xlim([0 distFromInit(end)])
 ylim([min(upstreamAreaProf),max(upstreamAreaProf)])
 
-% D. Draw upslope area - slope relationship
+%% draw upslope area - slope relationship
 
 subplot(2,1,2)
 scatter(upstreamAreaProf,slopePerDist(:,chosenSlopeForUpArea_Slope) ...
@@ -484,139 +462,16 @@ xlabel('Upstream Area [m^2]')
 ylabel('Slope')
 xlim([upstreamAreaProf(1),upstreamAreaProf(end)])
 
-%% Make stream network
-% 유역면적이 일정면적 이상인 셀을 하천으로 정의함
-% 유역 면적
-upstreamArea = upstreamCellsNo * double(dX * dY);
+%% export distance from divide map to ArcGIS to know the location
 
-% 하천 정의
-chanInitArea = 6000; % 하천 시작 임계점
-channel = upstreamArea >= chanInitArea;
+fileName = strcat(num2str(initY),'_',num2str(initX),'_',num2str(endY),'_',num2str(endX),'_profile_gradient.asc');
 
-% 하천인 셀에 한해서 stream network을 구함
-% * 주의: 유출구가 하나 이상일 경우도 있음
-
-% Make the database with tree structure for the stream network
-
-% Note: Eliminate the flow direction of the outlet cell
-SDSNbrY(outletY,outletX) = 0;
-SDSNbrX(outletY,outletX) = 0;
-
-% Note: contributing upstream area 가 다음 비율을 넘을 때만 stream network로
-% 인정함
-% criticalRatio
-
-[streamNet,streamNetElement,streamNetNodeInfo] ...
-    = MakeStreamNetwork(dX,dY,channel,outletY,outletX,SDSNbrY,SDSNbrX ...
-    ,floodedRegionIndex,floodedRegionCellsNo,criticalRatio ...
-    ,upstreamCellsNo,flatRegionPathInfo,flatRegionMap);
-
-% display the database with tree structure
-% disp(streamNet.tostring);
-
-%% Make stream longitudinal profiles and analyze them
-
-% Make a stream network with elevation
-streamNetWithElev = tree(streamNet,'clear');
-
-iterator = streamNetWithElev.breadthfirstiterator;		
-
-for i = iterator
-    
-    ithIdx = streamNet.get(i);
-    streamNetWithElev = streamNetWithElev.set(i,DEM(ithIdx));
-
+nCells = numel(streamPath);
+ithProfileDistMap = nan(mRows,nCols);
+for ithCell = 1:nCells
+    ithProfileDistMap(streamPath(ithCell)) = slopePerDist(ithCell);    
 end
+IPDFDFilePath = fullfile(OUTPUT_DIR,fileName);
+ExportRasterAsArcGrid(IPDFDFilePath,ithProfileDistMap,R.DeltaX ...
+    ,R.XLimWorld(1,1),R.YLimWorld(1,1));
 
-% Make a stream network with every distances btw upstream and downstream
-streamNetWithInterval ...
-    = CalcDistBtwUpDownStream(streamNet,streamNetElement ...
-    ,streamNetNodeInfo,dY,dX);
-
-% Make a stream network with flooded region index
-streamNetWithFldReg = tree(streamNet,'clear');
-
-iterator = streamNetWithFldReg.breadthfirstiterator;		
-for i = iterator
-    
-    ithIdx = streamNet.get(i);
-    streamNetWithFldReg ...
-        = streamNetWithFldReg.set(i,floodedRegionIndex(ithIdx));
-
-end
-
-% Identify major stream paths and calculate gradients of them and make a
-% stream gradient map
-
-% Input Variables
-% Settting the number of nodes from upstream cell to downstream cell
-noNodeBtwUpDown = 1;
-
-[streamPathInfo,streamNetDepth,streamGradMap,streamPathMap] ...
-    = IdentifyStreamPathInfo(noNodeBtwUpDown,streamNet,streamNetElement ...
-    ,streamNetNodeInfo,streamNetWithInterval,DEM,upstreamCellsNo);
-
-
-%% Draw stream longitudinal profile
-[nPath,tmp] = size(streamPathInfo);
-
-largestStreamLength = max(max(cell2mat(streamPathInfo(:,3))));
-
-figure;
-cc = jet(nPath);
-legendNames = cell(nPath,1);
-for ithPath = 1:nPath
-
-    elev = streamPathInfo{ithPath,5};
-    distanceFromDivide = streamPathInfo{ithPath,6};
-    
-    % 가장 긴 하천종단곡선의 거리에서 현 하천종단곡선의 거리를 뺌.
-    distBtwEndOfProfileToMainOutlet ...
-        = largestStreamLength - distanceFromDivide(end);
-
-    plot(distanceFromDivide + distBtwEndOfProfileToMainOutlet ...
-        ,elev,'color',cc(ithPath,:));
-    
-    legendNames{ithPath,1} = num2str(streamPathInfo{ithPath,1});
-    
-    hold on  
-        
-end
-
-% legend(legendNames);
-    
-grid on
-title('Longitudinal Stream Profile')
-xlabel('Distance From Divide [m]')
-ylabel('Elevation [m]')
-
-
-%% Draw slope - area graph
-[nPath,tmp] = size(streamPathInfo);
-
-figure;
-cc = jet(nPath);
-legendNames = cell(nPath,1);
-for ithPath = 1:nPath
-
-    upstreamCellsNoP = streamPathInfo{ithPath,8};
-    upstreamAreaP = upstreamCellsNoP * double(dX * dY);
-    streamGradient = streamPathInfo{ithPath,7};
-
-    
-    % 가장 긴 하천종단곡선의 거리에서 현 하천종단곡선의 거리를 뺌.
-
-    scatter(upstreamAreaP,streamGradient,'Marker','*','MarkerFaceColor',cc(ithPath,:));
-        
-    legendNames{ithPath,1} = num2str(streamPathInfo{ithPath,1});
-    
-    hold on  
-        
-end
-
-% legend(legendNames);
-set(gca,'XScale','log','YScale','log');
-grid on
-title('Area - Slope')
-xlabel('Upstream Area')
-ylabel('Slope')
