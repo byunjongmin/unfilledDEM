@@ -3,25 +3,41 @@ function main
 % @brief Function to extract stream longitudinal profiles from unfilled
 % DEMs
 %
-% @version 0.2.1. / 2015-11-19
+% @version 0.3.0 / 2015-11-20
 % @author Jongmin Byun
 %==========================================================================
 
-%% Load DEM
+clear all
 
+%% Load DEM
 % Constants
 INPUT_DIR = '../data/input';
 OUTPUT_DIR = '../data/output';
-DEMFileName = 'n37_e128_1arc_v3';
+DEMFileName = 'tareaR50m.tif';
 DEMFilePath = fullfile(INPUT_DIR,DEMFileName);
 [DEM,R] = geotiffread(DEMFilePath);
+% note that R means MapCellsReference or GeographicPostingsReference
+% according to CoordinateSysteamType
 
 % DEM basic properties
 mRows = R.RasterSize(1,1);
 nCols = R.RasterSize(1,2);
-% dX = R.DeltaX;
-% dY = -R.DeltaY;
-dX = 30; dY = 30; % meter
+if strcmp(R.CoordinateSystemType,'planar')
+    
+    dX = R.CellExtentInWorldX;
+    dY = R.CellExtentInWorldY;
+    
+else % strcmp(R,'geographic')
+    
+    CIR_EQUATOR = 40075; % circumference at equator [km]
+    CIR_MERIDIAN = 40008; % meridional circumference [km]
+    rLat = (R.LatitudeLimits(2) - R.LatitudeLimits(1)) * 0.5;
+    
+    dY = CIR_MERIDIAN * 1000 / 360 * R.SampleSpacingInLatitude;
+    dX = CIR_EQUATOR * 1000 / 360 * cos(rLat * pi / 180) * R.SampleSpacingInLatitude;
+
+end
+
 DEM = double(DEM);
 
 %% Define target drainage
@@ -123,15 +139,15 @@ end
 
 %% for debug
 
-% % For debug
-% clear all
-% INPUT_DIR = '../data/input';
-% dataFileName = 'b_IS_IT_PART_2015-11-18.mat';
-% dataFilePath = fullfile(INPUT_DIR,dataFileName);
-% load(dataFilePath);
+% For debug
+clear all
+INPUT_DIR = '../data/input';
+dataFileName = 'b_IS_IT_PART_2015-11-18.mat';
+dataFilePath = fullfile(INPUT_DIR,dataFileName);
+load(dataFilePath);
 
-IS_IT_PART = false;
-IS_BND_INF = false;
+IS_IT_PART = true;
+IS_BND_INF = true;
 
 if IS_IT_PART == true
     
@@ -141,8 +157,6 @@ if IS_IT_PART == true
 
     DEM = DEM(tYMin:tYMax,tXMin:tXMax);
     [mRows,nCols] = size(DEM);
-    
-
     
     if IS_BND_INF == true
         
@@ -189,7 +203,8 @@ if IS_IT_PART == true
     % flatRegMap = ProcessFlat(DEM,targetDrainage,slopeAllNbr);
     
     % for debug
-    figure(2);
+    figure(2); clf;
+    set(gcf, 'Color',[1,1,1]);
 
     imagesc(DEM);
     set(gca,'DataAspectRatio',[1 1 1]);
@@ -216,12 +231,7 @@ end
 ,sharedOutlet] ... % shared outlet map
     = ProcessSink(DEM,targetDrainage,slopeAllNbr ...
         ,SDSNbrY,SDSNbrX,SDSFlowDirection);
-    
-% % For debug
-% INPUT_DIR = '../data/input';
-% dataFileName = 'a_PSink_2015-11-09.mat';
-% dataFilePath = fullfile(INPUT_DIR,dataFileName);
-% load(dataFilePath);
+
     
 % frequency distribution of the types of sub-flooded region's outlet
 figure(3); clf;
@@ -234,27 +244,26 @@ grid on
 % set boundary
 fXMin = 1; fXMax = nCols;
 fYMin = 1; fYMax = mRows;
-figure(4)
 
-subplot(2,2,1)
-imagesc(DEM(fYMin:fYMax,fXMin:fXMax));
-colorbar;
-set(gca,'DataAspectRatio',[1 1 1]);
-title('DEM');
+figure(4); clf;
+set(gcf, 'Color',[1,1,1]);
 
-subplot(2,2,2)
 imagesc(fldRegID(fYMin:fYMax,fXMin:fXMax));
 colorbar;
 set(gca,'DataAspectRatio',[1 1 1]);
 title('Flooded Region ID');
 
-subplot(2,2,3)
+figure(5); clf;
+set(gcf, 'Color',[1,1,1]);
+
 imagesc(subFldRegID(fYMin:fYMax,fXMin:fXMax));
 colorbar;
 set(gca,'DataAspectRatio',[1 1 1]);
 title('Sub-flooded Region ID');
 
-subplot(2,2,4)
+figure(6); clf;
+set(gcf, 'Color',[1,1,1]);
+
 imagesc(subFldRegOutlet(fYMin:fYMax,fXMin:fXMax));
 colorbar;
 set(gca,'DataAspectRatio',[1 1 1]);
@@ -287,7 +296,7 @@ nUpstreamCells ...
     ,m2SDSNbrY,m2SDSNbrX,subFldRegID,DEM,regionalMin);   
 
 % Visualization for the number of upstream cells
-figure(5);
+figure(7);
 set(gcf,'Color',[1 1 1])
 
 subplot(1,3,1)
@@ -314,7 +323,7 @@ set(gca,'YTick',[],'XTick' ,[])
 colormap(flipud(colormap(gray)))
 colorbar
 
-figure(6)
+figure(8)
 set(gcf,'Color',[1 1 1])
 imagesc(nUpstreamCells(2:end-1,2:end-1));
 title('Upstream Cells No.');
@@ -327,6 +336,21 @@ colorbar
 
 %% draw a stream longitudinal profile on the interesting stream path
 
+% for debug
+clear all
+INPUT_DIR = '../data/input';
+dataFileName = 'a_CalcUpstreamCells_2015-11-18.mat';
+dataFilePath = fullfile(INPUT_DIR,dataFileName);
+load(dataFilePath);
+
+figure(2); clf;
+set(gcf, 'Color',[1,1,1]);
+
+imagesc(DEM);
+set(gca,'DataAspectRatio',[1 1 1]);
+colorbar;
+title('Digital Elevation Model');
+
 % identify stream path using given initial and end point coordinates
 initY = 617; initX = 719;
 endY = 852; endX = 299;
@@ -335,10 +359,13 @@ endY = 852; endX = 299;
 
 % stream longitudinal profile using raw DEM
 elev = DEM(streamPath(:));
+nCells = numel(streamPath);
 
 % draw figure
-figure(7); clf;
+figure(9); clf;
 set(gcf, 'Color',[1,1,1]);
+
+subplot(3,1,1)
 stairs(distFromInit,elev);
 
 % grid on
@@ -348,17 +375,16 @@ ylabel('Elevation [m]')
 xlim([0 distFromInit(end)])
 ylim([min(elev),max(elev)])
 
-%% smoothing stream profiles
+% smoothing stream profiles
 
-considerNbrForElev = 150; % number of considering neighbor cells
+considerNbrForElev = [50,150]; % number of considering neighbor cells
 % note that you can compare the differences due to the number of
 % considering neighbor cells
 nCNbr = numel(considerNbrForElev); % number of cases
 
 smoothedElev = SmoothingElev(considerNbrForElev,distFromInit,DEM,streamPath);
 
-figure(8); clf;
-set(gcf, 'Color',[1,1,1]);
+subplot(3,1,2)
 
 cc = jet(nCNbr);
 for ithLine = 1:nCNbr
@@ -373,7 +399,7 @@ ylabel('Elevation [m]')
 xlim([0 distFromInit(end)])
 ylim([min(elev),max(elev)])
 
-%% draw stream gradient
+% draw stream gradient
 
 considerNbrForSlope = 45;
 chosenSizeForSlope = 1;
@@ -382,8 +408,7 @@ nCNbrForSlope = numel(considerNbrForSlope);
 slopePerDist = CalcSlope(considerNbrForSlope,distFromInit,smoothedElev ...
     ,chosenSizeForSlope);
 
-figure(9); clf;
-set(gcf, 'Color',[1,1,1]);
+subplot(3,1,3)
 
 cc = jet(nCNbrForSlope);
 for ithLine = 1:nCNbrForSlope
@@ -392,12 +417,13 @@ for ithLine = 1:nCNbrForSlope
 end
 
 grid on
+title('Stream Gradient Profile')
 xlabel('Distance From Initiaion [m]')
 ylabel('Slope')
 xlim([0 distFromInit(end)])
 ylim([min(slopePerDist(:,1)),max(slopePerDist(:,1))])
 
-%% draw corrected upstream area profiles on the interesting stream paths
+% draw corrected upstream area profiles on the interesting stream paths
 
 % choose a stream gradient profile
 chosenSlopeForUpArea_Slope = 1;
@@ -435,7 +461,7 @@ for ithCell = 2:nCells
 
 end
 
-figure(10); clf;
+figure(12); clf;
 set(gcf, 'Color',[1,1,1]);
 
 subplot(2,1,1)
@@ -449,7 +475,7 @@ ylabel('Upstream Area [m^2]')
 xlim([0 distFromInit(end)])
 ylim([min(upstreamAreaProf),max(upstreamAreaProf)])
 
-%% draw upslope area - slope relationship
+% draw upslope area - slope relationship
 
 subplot(2,1,2)
 scatter(upstreamAreaProf,slopePerDist(:,chosenSlopeForUpArea_Slope) ...
@@ -462,16 +488,16 @@ xlabel('Upstream Area [m^2]')
 ylabel('Slope')
 xlim([upstreamAreaProf(1),upstreamAreaProf(end)])
 
-%% export distance from divide map to ArcGIS to know the location
+% export stream gradient profile to ArcGIS
 
-fileName = strcat(num2str(initY),'_',num2str(initX),'_',num2str(endY),'_',num2str(endX),'_profile_gradient.asc');
+fileName = strcat(num2str(initY),'_',num2str(initX),'_',num2str(endY),'_',num2str(endX),'_profile_gradient');
 
-nCells = numel(streamPath);
 ithProfileDistMap = nan(mRows,nCols);
 for ithCell = 1:nCells
     ithProfileDistMap(streamPath(ithCell)) = slopePerDist(ithCell);    
 end
-IPDFDFilePath = fullfile(OUTPUT_DIR,fileName);
+% IPDFDFilePath = fullfile(OUTPUT_DIR,fileName);
+IPDFDFilePath = fullfile('/Users/cyberzen/Dropbox/temp',fileName);
 ExportRasterAsArcGrid(IPDFDFilePath,ithProfileDistMap,R.DeltaX ...
     ,R.XLimWorld(1,1),R.YLimWorld(1,1));
 
