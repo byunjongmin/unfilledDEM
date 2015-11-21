@@ -146,7 +146,7 @@ dataFileName = 'b_IS_IT_PART_2015-11-18.mat';
 dataFilePath = fullfile(INPUT_DIR,dataFileName);
 load(dataFilePath);
 
-IS_IT_PART = true;
+IS_IT_PART = false;
 IS_BND_INF = true;
 
 if IS_IT_PART == true
@@ -288,7 +288,7 @@ disp(subFldRegTree.tostring);
 % % for debug
 % clear all
 % INPUT_DIR = '../data/input';
-% dataFileName = 'a_CalcUpstreamCells_2015-11-18.mat';
+% dataFileName = 'a_CalcUpstreamCells_2015-11-20.mat';
 % dataFilePath = fullfile(INPUT_DIR,dataFileName);
 % load(dataFilePath);
 
@@ -343,12 +343,12 @@ colorbar
 
 %% draw a stream longitudinal profile on the interesting stream path
 
-% for debug
-clear all
-INPUT_DIR = '../data/input';
-dataFileName = 'a_CalcUpstreamCells_2015-11-18.mat';
-dataFilePath = fullfile(INPUT_DIR,dataFileName);
-load(dataFilePath);
+% % for debug
+% clear all
+% INPUT_DIR = '../data/input';
+% dataFileName = 'a_CalcUpstreamCells_2015-11-18.mat';
+% dataFilePath = fullfile(INPUT_DIR,dataFileName);
+% load(dataFilePath);
 
 figure(2); clf;
 set(gcf, 'Color',[1,1,1]);

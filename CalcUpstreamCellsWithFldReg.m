@@ -3,7 +3,7 @@ function upstreamCellsNo = CalcUpstreamCellsWithFldReg(DEM,chosenWatershed ...
 % @file CalcUpstreamCellsWithFldReg.m
 % @brief Calculate upstream cells considering flooded region
 %
-% @version 0.1.1. / 2015-11-13
+% @version 0.1.2. / 2015-11-20
 % @author Jongmin Byun
 %==========================================================================
 
@@ -26,6 +26,7 @@ upstreamCellsNo = zeros(mRows,nCols);
 % sort cells according to elevation
 % note that it excludes flooded region and areas out of chosenWatershed
 orgDEM = DEM;
+orgDEM(isinf(orgDEM)) = nan;
 DEM(flood == FLOODED | ~chosenWatershed) = -9999;
 vectorDEM = reshape(DEM(Y_INI:Y_MAX,X_INI:X_MAX),[],1);
 
@@ -37,11 +38,14 @@ vectorFldRegOutlet = reshape(fldRegOutlet(Y_INI:Y_MAX,X_INI:X_MAX),[],1);
 % according to the averaged elevation of flooded region
 outletIdx = find(floodedRegionIndex < 0);
 meanElevFldReg = zeros(mRows,nCols);
+s = strel('square',9);
 for ithOutlet = 1:numel(outletIdx)
     
     ithFldRegID = -floodedRegionIndex(outletIdx(ithOutlet));
-    ithFldRegIdx = floodedRegionIndex == ithFldRegID;
-    meanElevFldReg(outletIdx(ithOutlet)) = mean(orgDEM(ithFldRegIdx));
+    ithFldRegMap = floodedRegionIndex == ithFldRegID;
+    dIthFldRegMap ... % dilated ith flooded region
+                = imdilate(ithFldRegMap,s);
+    meanElevFldReg(outletIdx(ithOutlet)) = nanmean(orgDEM(dIthFldRegMap));
     
 end
 
