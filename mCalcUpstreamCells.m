@@ -17,7 +17,7 @@ function nUpstreamCells ...
 % @retval nUpstreamCells
 % @retval markForGoneCells
 %
-% @version 2.0.3 / 2015-11-18
+% @version 2.0.5 / 2015-11-20
 % @author Jongmin Byun
 %==========================================================================
 
@@ -54,5 +54,6 @@ for i = 1:nTotalCells
         nUpstreamCells(dStreamNbrY,dStreamNbrX) ...
             = nUpstreamCells(dStreamNbrY,dStreamNbrX) ...
             + nUpstreamCells(iCellY,iCellX);
+        
     end
 end

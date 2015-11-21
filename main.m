@@ -152,8 +152,8 @@ IS_BND_INF = true;
 if IS_IT_PART == true
     
     % For debug for a part of DEM
-    tYMin = 743; tYMax = 793;
-    tXMin = 212; tXMax = 260;
+    tYMin = 558; tYMax = 658;
+    tXMin = 117; tXMax = 168;
 
     DEM = DEM(tYMin:tYMax,tXMin:tXMax);
     [mRows,nCols] = size(DEM);
@@ -284,6 +284,13 @@ title('Sub-flooded Region Outlet');
 disp(subFldRegTree.tostring);
 
 %% Calculate upstream cells number of all cells within every depression
+
+% % for debug
+% clear all
+% INPUT_DIR = '../data/input';
+% dataFileName = 'a_CalcUpstreamCells_2015-11-18.mat';
+% dataFilePath = fullfile(INPUT_DIR,dataFileName);
+% load(dataFilePath);
 
 % A. Calculate the number of upstream cells out of flooded region
 nUpstreamCellsWithFldReg = CalcUpstreamCellsWithFldReg(DEM,targetDrainage ...

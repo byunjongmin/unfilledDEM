@@ -27,7 +27,7 @@ function [m2SDSNbrY,m2SDSNbrX,mFlowDir_SubFldReg,mFlowDir_Saddle ...
 % @retval root: tree database of sub-flooded regions
 % @retval fldRegInfo
 %
-% @version 0.2.2 / 2015-11-16
+% @version 0.3.0 / 2015-11-20
 % @author Jongmin Byun
 %==========================================================================
 
@@ -159,6 +159,28 @@ for i = 1:nFldReg
                 nAdjSubFldReg = numel(adjSubFldRegRow);
                 if nAdjSubFldReg > 0
                     
+                    % sort the adjacent sub-flooded regions according to
+                    % the elevation of each outlet
+                    if nAdjSubFldReg > 1
+                        
+                        orderK = zeros(nAdjSubFldReg,3);
+                        for z = 1:nAdjSubFldReg
+
+                            orderK(z,1) = adjSubFldRegRow(z);
+                            orderK(z,2) = adjSubFldRegID(z);
+                            
+                            outletY = subFldRegOutInfo(orderK(z,1),4);
+                            outletX = subFldRegOutInfo(orderK(z,1),5);
+                            orderK(z,3) = DEM(outletY,outletX);
+
+                        end
+
+                        orderK = sortrows(orderK,-3);
+                        adjSubFldRegRow = orderK(:,1);
+                        adjSubFldRegID = orderK(:,2);
+                        
+                    end
+                    
                     for k = 1:nAdjSubFldReg
                     
                         row = adjSubFldRegRow(k);
@@ -188,7 +210,7 @@ for i = 1:nFldReg
                                     nOutConnectedSubFldReg = nOutConnectedSubFldReg + 1; 
                                 end
                                     
-                            else
+                            else % ~(outletY == ithFldRegOutY && outletX == ithFldRegOutX)
                                     
                                 if ~ismember(adjSubFldRegID(k),goneSubFldRegID)
                                     % list for saddle connected sub-flooded region

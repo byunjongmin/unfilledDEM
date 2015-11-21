@@ -21,7 +21,7 @@ function nUpstreamCells ...
 % @param[in] nFlatRegCells
 % @retval nUpstreamCells
 %
-% @version 2.1.2 / 2015-11-18
+% @version 2.1.4 / 2015-11-20
 %
 % @author Jongmin Byun
 %==========================================================================
