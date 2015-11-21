@@ -161,6 +161,9 @@ for i = 1:nFldReg
                     
                     % sort the adjacent sub-flooded regions according to
                     % the elevation of each outlet
+                    % note that choose the sub-flooded region with the highest
+                    % saddle to prevent discontinuity of flow accumulation from
+                    % a node sub-flooded region to a parent sub-flooded region
                     if nAdjSubFldReg > 1
                         
                         orderK = zeros(nAdjSubFldReg,3);
