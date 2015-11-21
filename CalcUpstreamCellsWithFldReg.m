@@ -3,7 +3,7 @@ function upstreamCellsNo = CalcUpstreamCellsWithFldReg(DEM,chosenWatershed ...
 % @file CalcUpstreamCellsWithFldReg.m
 % @brief Calculate upstream cells considering flooded region
 %
-% @version 0.1.2. / 2015-11-20
+% @version 0.2.1. / 2015-11-20
 % @author Jongmin Byun
 %==========================================================================
 
@@ -34,12 +34,22 @@ vectorDEM = reshape(DEM(Y_INI:Y_MAX,X_INI:X_MAX),[],1);
 fldRegOutlet = floodedRegionCellsNo > 0;
 vectorFldRegOutlet = reshape(fldRegOutlet(Y_INI:Y_MAX,X_INI:X_MAX),[],1);
 
-% for the cells with same elevation as well as of outlet, sort cells
-% according to the averaged elevation of flooded region
+% for the flooded region outlet cells with the same elevation, sort cells
+% according to its downstream cell and the averaged elevation of flooded region
 outletIdx = find(floodedRegionIndex < 0);
+outletToWet = false(mRows,nCols);
 meanElevFldReg = zeros(mRows,nCols);
 s = strel('square',9);
 for ithOutlet = 1:numel(outletIdx)
+    
+    outletSDSNbrY = SDSNbrY(outletIdx(ithOutlet));
+    outletSDSNbrX = SDSNbrX(outletIdx(ithOutlet));
+    
+    if floodedRegionIndex(outletSDSNbrY,outletSDSNbrX) > 0
+        
+        outletToWet(outletIdx(ithOutlet)) = true;
+        
+    end
     
     ithFldRegID = -floodedRegionIndex(outletIdx(ithOutlet));
     ithFldRegMap = floodedRegionIndex == ithFldRegID;
@@ -51,8 +61,11 @@ end
 
 vectorMeanElevFldReg ...
     = reshape(meanElevFldReg(Y_INI:Y_MAX,X_INI:X_MAX),[],1);
-sortedDEMYX = [vectorY,vectorX,vectorDEM,vectorFldRegOutlet,vectorMeanElevFldReg];
-sortedDEMYX = sortrows(sortedDEMYX,[-3,4,-5]);
+vectorOutletToWet ...
+    = reshape(outletToWet(Y_INI:Y_MAX,X_INI:X_MAX),[],1);
+sortedDEMYX = [vectorY,vectorX,vectorDEM,vectorFldRegOutlet...
+                    ,vectorOutletToWet,vectorMeanElevFldReg];
+sortedDEMYX = sortrows(sortedDEMYX,[-3,4,-5,-6]);
 consideringCellsNo = find(vectorDEM > -9999);
 consideringCellsNo = size(consideringCellsNo,1);
 

@@ -285,12 +285,12 @@ disp(subFldRegTree.tostring);
 
 %% Calculate upstream cells number of all cells within every depression
 
-% % for debug
-% clear all
-% INPUT_DIR = '../data/input';
-% dataFileName = 'a_CalcUpstreamCells_2015-11-20.mat';
-% dataFilePath = fullfile(INPUT_DIR,dataFileName);
-% load(dataFilePath);
+% for debug
+clear all
+INPUT_DIR = '../data/input';
+dataFileName = 'a_CalcUpstreamCells_2015-11-20.mat';
+dataFilePath = fullfile(INPUT_DIR,dataFileName);
+load(dataFilePath);
 
 % A. Calculate the number of upstream cells out of flooded region
 nUpstreamCellsWithFldReg = CalcUpstreamCellsWithFldReg(DEM,targetDrainage ...
