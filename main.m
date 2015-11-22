@@ -288,7 +288,7 @@ disp(subFldRegTree.tostring);
 % for debug
 clear all
 INPUT_DIR = '../data/input';
-dataFileName = 'a_CalcUpstreamCells_2015-11-20.mat';
+dataFileName = 'a_CalcUpstreamCells_2015-11-20_2.mat';
 dataFilePath = fullfile(INPUT_DIR,dataFileName);
 load(dataFilePath);
 
