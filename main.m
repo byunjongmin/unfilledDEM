@@ -3,7 +3,7 @@ function main
 % @brief Function to extract stream longitudinal profiles from unfilled
 % DEMs
 %
-% @version 0.3.2 / 2015-11-22
+% @version 0.3.3 / 2015-11-22
 % @author Jongmin Byun
 %==========================================================================
 
@@ -125,18 +125,36 @@ flatRegMap = ProcessFlat(DEM,targetDrainage,slopeAllNbr);
 
 rT = 0;
 afterNFlat = inf;
+fSize = 10;
+dCon = 0.95; % decay constant
+nSmooth = 10;
 while afterNFlat > 0
 
     fprintf('The remaining flat cell is %4.2f\n',afterNFlat);
     % smooth only flat. To prevent an infinite loop, change the size of
     % moving window when flat region does not reduce 
-    if rT > 5
-        nNbr = 5;
-    else
-        nNbr = 3;
+    if rT > 2
+        fSize = fSize + 1;
     end    
-    h = ones(nNbr,nNbr)/nNbr^2;
-    smtDEM = filter2(h,DEM);
+    
+    % bell shaped weight
+    h = ones(fSize*2+1,fSize*2+1);
+    for i = 1:fSize
+        h(i:(end+1)-i,i:(end+1)-i) = dCon^(fSize-i);
+    end
+        
+    h = 0.25 * ones(7,7);
+    h(2:end-1,2:end-1) = 0.5;
+    h(3:end-2,3:end-2) = 1;
+    h = 1/sum(sum(h)) * h;
+    
+    smtDEM = DEM;
+    for i=1:nSmooth
+        
+        smtDEM = filter2(h,smtDEM);
+
+    end
+    
     DEM(flatRegMap == true) = smtDEM(flatRegMap == true);
     [steepestDescentSlope,slopeAllNbr,SDSFlowDirection,SDSNbrY,SDSNbrX] ...
         = CalcSDSFlow(DEM,dX,dY);
