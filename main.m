@@ -3,17 +3,18 @@ function main
 % @brief Function to extract stream longitudinal profiles from unfilled
 % DEMs
 %
-% @version 0.3.0 / 2015-11-20
+% @version 0.3.2 / 2015-11-22
 % @author Jongmin Byun
 %==========================================================================
 
+%% Load DEM
+
 clear all
 
-%% Load DEM
 % Constants
 INPUT_DIR = '../data/input';
 OUTPUT_DIR = '../data/output';
-DEMFileName = 'tareaR50m.tif';
+DEMFileName = 'n37_e128_1arc_v3.tif';
 DEMFilePath = fullfile(INPUT_DIR,DEMFileName);
 [DEM,R] = geotiffread(DEMFilePath);
 % note that R means MapCellsReference or GeographicPostingsReference
@@ -41,6 +42,13 @@ end
 DEM = double(DEM);
 
 %% Define target drainage
+
+% For debug
+clear all
+INPUT_DIR = '../data/input';
+dataFileName = 'a_load_DEM_2015-11-22.mat';
+dataFilePath = fullfile(INPUT_DIR,dataFileName);
+load(dataFilePath);
 
 % for the domain surrounded by null
 nanMask = (DEM == 32767);
@@ -70,11 +78,42 @@ DEM(outletY,outletX) = min(DEM(:)) - 0.1;
 targetDrainage = (~nanMask);
 targetDrainage(outletY,outletX) = false;
 
-%% Main body
+% Main body
 
-%% Smooth the imported DEM, until the flat is removed
+% Smooth the imported DEM, until the flat is removed
 orgDEM = DEM; % original DEM
 
+WANT_SMOOTH = false;
+fSize = 10;
+dCon = 0.95; % decay constant
+nSmooth = 150;
+if WANT_SMOOTH == true
+    
+    % h = 1/9*ones(3); % mean filter
+    % bell shaped weight
+    h = ones(fSize*2+1,fSize*2+1);
+    for i = 1:fSize
+        h(i:(end+1)-i,i:(end+1)-i) = dCon^(fSize-i);
+    end
+        
+    h = 0.25 * ones(7,7);
+    h(2:end-1,2:end-1) = 0.5;
+    h(3:end-2,3:end-2) = 1;
+    h = 1/sum(sum(h)) * h;
+    
+    for j=1:nSmooth
+        
+        DEM = filter2(h,DEM);
+        
+    end
+    
+    figure(1); clf;
+    imagesc(DEM);
+    set(gca,'DataAspectRatio',[1 1 1]);
+    colorbar;
+    title('Smoothed Digital Elevation Model');
+
+end
 % Assign flow directions to the DEM using D8 algorithm
 % Note that, to use CalcSDSFlow function, elevation of outer region of the
 % target drainage should be inf.
@@ -95,7 +134,7 @@ while afterNFlat > 0
         nNbr = 5;
     else
         nNbr = 3;
-    end
+    end    
     h = ones(nNbr,nNbr)/nNbr^2;
     smtDEM = filter2(h,DEM);
     DEM(flatRegMap == true) = smtDEM(flatRegMap == true);
@@ -114,7 +153,8 @@ while afterNFlat > 0
 end
 
 % for debug
-figure(1);
+figure(2); clf;
+
 subplot(1,2,1);
 imagesc(flatRegMap);
 set(gca,'DataAspectRatio',[1 1 1]);
@@ -137,14 +177,14 @@ if CC.NumObjects > 1
     targetDrainage(CC.PixelIdxList{2:end}) = false;
 end
 
-%% for debug
+% for debug
 
-% For debug
-clear all
-INPUT_DIR = '../data/input';
-dataFileName = 'b_IS_IT_PART_2015-11-18.mat';
-dataFilePath = fullfile(INPUT_DIR,dataFileName);
-load(dataFilePath);
+% % For debug
+% clear all
+% INPUT_DIR = '../data/input';
+% dataFileName = 'b_IS_IT_PART_2015-11-18.mat';
+% dataFilePath = fullfile(INPUT_DIR,dataFileName);
+% load(dataFilePath);
 
 IS_IT_PART = false;
 IS_BND_INF = true;
@@ -203,7 +243,7 @@ if IS_IT_PART == true
     % flatRegMap = ProcessFlat(DEM,targetDrainage,slopeAllNbr);
     
     % for debug
-    figure(2); clf;
+    figure(3); clf;
     set(gcf, 'Color',[1,1,1]);
 
     imagesc(DEM);
@@ -213,7 +253,7 @@ if IS_IT_PART == true
     
 end
 
-%% Identify depressions and their outlets, then modify each depression
+% Identify depressions and their outlets, then modify each depression
 % outlet's flow direction to go downstream when flows are overspilled
 % over the depression
 
@@ -234,7 +274,7 @@ end
 
     
 % frequency distribution of the types of sub-flooded region's outlet
-figure(3); clf;
+figure(4); clf;
 set(gcf, 'Color',[1,1,1]);
 h = histogram(subFldRegOutlet(subFldRegOutlet > 0));
 xlabel('Type of Sub-flooded Region Outlet');
@@ -269,7 +309,7 @@ colorbar;
 set(gca,'DataAspectRatio',[1 1 1]);
 title('Sub-flooded Region Outlet');
 
-%% Modify flow direction of the cells within each depression
+% Modify flow direction of the cells within each depression
 
 % Assign flow direction to the cells in each depression region
 [m2SDSNbrY,m2SDSNbrX ... % flow direction modified cells along the path to each regional minima
