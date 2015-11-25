@@ -3,7 +3,7 @@ function main
 % @brief Function to extract stream longitudinal profiles from unfilled
 % DEMs
 %
-% @version 0.3.3 / 2015-11-22
+% @version 0.4.0 / 2015-11-25
 % @author Jongmin Byun
 %==========================================================================
 
@@ -41,225 +41,67 @@ end
 
 DEM = double(DEM);
 
-%% Define target drainage
+figure(1); clf;
+imagesc(DEM);
+set(gca,'DataAspectRatio',[1 1 1]);
+colorbar;
+title('Smoothed Digital Elevation Model');
 
-% For debug
-clear all
-INPUT_DIR = '../data/input';
-dataFileName = 'a_load_DEM_2015-11-22.mat';
-dataFilePath = fullfile(INPUT_DIR,dataFileName);
-load(dataFilePath);
+%% Check and remove flat cells in DEM
 
-% for the domain surrounded by null
-nanMask = (DEM == 32767);
-DEM(nanMask) = inf;
-DEMArea = ~nanMask;
-
-% note that you should check the location of the outlet of the test domain.
-% It should be located on the boundary of a drainage. If it is within the
-% drainage, you should modify the DEM
-
-% extract the boundary of the target drainage
-s = strel('square',3); % structural element when eroding image
-eDEMArea = imerode(DEMArea,s); 
-DEMAreaBnd = DEMArea & ~eDEMArea;
-DEMAreaBndIdx = find(DEMAreaBnd);
-
-% identify the coordinate of the outlet
-DEMAreaBndElev = DEM(DEMAreaBndIdx);
-[~,minElevIdx] = min(DEMAreaBndElev);
-outletIdx = DEMAreaBndIdx(minElevIdx); % outlet on the boundary of drainage
-[outletY,outletX] = ind2sub([mRows,nCols],outletIdx);
-
-% Note that the elevation of the main outlet should be the lowest.
-DEM(outletY,outletX) = min(DEM(:)) - 0.1;
-
-% define target drainage
-targetDrainage = (~nanMask);
-targetDrainage(outletY,outletX) = false;
-
-% Main body
-
-% Smooth the imported DEM, until the flat is removed
-orgDEM = DEM; % original DEM
-
-WANT_SMOOTH = false;
-fSize = 10;
-dCon = 0.95; % decay constant
-nSmooth = 150;
-if WANT_SMOOTH == true
-    
-    % h = 1/9*ones(3); % mean filter
-    % bell shaped weight
-    h = ones(fSize*2+1,fSize*2+1);
-    for i = 1:fSize
-        h(i:(end+1)-i,i:(end+1)-i) = dCon^(fSize-i);
-    end
-        
-    h = 0.25 * ones(7,7);
-    h(2:end-1,2:end-1) = 0.5;
-    h(3:end-2,3:end-2) = 1;
-    h = 1/sum(sum(h)) * h;
-    
-    for j=1:nSmooth
-        
-        DEM = filter2(h,DEM);
-        
-    end
-    
-    figure(1); clf;
-    imagesc(DEM);
-    set(gca,'DataAspectRatio',[1 1 1]);
-    colorbar;
-    title('Smoothed Digital Elevation Model');
-
-end
 % Assign flow directions to the DEM using D8 algorithm
 % Note that, to use CalcSDSFlow function, elevation of outer region of the
 % target drainage should be inf.
+nanMask = (DEM == 32767 | DEM == -9999);
+DEM(nanMask) = inf;
 [steepestDescentSlope,slopeAllNbr,SDSFlowDirection,SDSNbrY,SDSNbrX] ...
     = CalcSDSFlow(DEM,dX,dY);
 
-% Process flat and sinks for flow to continue to move
-flatRegMap = ProcessFlat(DEM,targetDrainage,slopeAllNbr);
+% identify flat cells in DEM
+flatRegMap = ProcessFlat(DEM,~nanMask,slopeAllNbr);
 
-rT = 0;
+orgDEM = DEM; % original DEM
 afterNFlat = inf;
-fSize = 10;
-dCon = 0.95; % decay constant
-nSmooth = 10;
 while afterNFlat > 0
 
-    fprintf('The remaining flat cell is %4.2f\n',afterNFlat);
-    % smooth only flat. To prevent an infinite loop, change the size of
-    % moving window when flat region does not reduce 
-    if rT > 2
-        fSize = fSize + 1;
-    end    
-    
-    % bell shaped weight
-    h = ones(fSize*2+1,fSize*2+1);
-    for i = 1:fSize
-        h(i:(end+1)-i,i:(end+1)-i) = dCon^(fSize-i);
-    end
+    fprintf('The number of remaining flat cells is %4.0f\n',afterNFlat);
         
-    h = 0.25 * ones(7,7);
-    h(2:end-1,2:end-1) = 0.5;
-    h(3:end-2,3:end-2) = 1;
-    h = 1/sum(sum(h)) * h;
-    
-    smtDEM = DEM;
-    for i=1:nSmooth
-        
-        smtDEM = filter2(h,smtDEM);
+    % add small random elevation values to DEM
+    randE = rand(mRows,nCols);
+    DEM = DEM + randE;
 
-    end
-    
-    DEM(flatRegMap == true) = smtDEM(flatRegMap == true);
+    % update elevation values only for the flat cells
+    DEM(flatRegMap == true) = DEM(flatRegMap == true);
+
     [steepestDescentSlope,slopeAllNbr,SDSFlowDirection,SDSNbrY,SDSNbrX] ...
         = CalcSDSFlow(DEM,dX,dY);
-    flatRegMap = ProcessFlat(DEM,targetDrainage,slopeAllNbr);
-    
-    oldNFlat = afterNFlat;
+
+    flatRegMap = ProcessFlat(DEM,~nanMask,slopeAllNbr);
+
+    % update the number of flat cells in DEM
     afterNFlat = numel(find(flatRegMap == true));
-    if oldNFlat >= afterNFlat
-        rT = rT + 1;
-    else
-        rT = 0;
-    end
     
 end
 
 % for debug
+diffDEM = orgDEM - DEM;
+
 figure(2); clf;
-
-subplot(1,2,1);
-imagesc(flatRegMap);
-set(gca,'DataAspectRatio',[1 1 1]);
-title('Distribution of Flat Region');
-
-subplot(1,2,2);
-diffDEM = orgDEM - DEM; % for debug
 imagesc(diffDEM);
 set(gca,'DataAspectRatio',[1 1 1]);
 colorbar;
-title('Difference in Elevation after Smoothing');
+title('Flat cells in DEM');
 
-%% Remove isolated area
+%% Define target drainage
 
-DEM_BW = false(mRows,nCols); % binary of DEM
-DEM_BW(~isinf(DEM)) = true;
-CC = bwconncomp(DEM_BW); % identify connected components of valid cells
-if CC.NumObjects > 1
-    DEM(CC.PixelIdxList{2:5}) = inf; % remove the connected components except for the target area
-    targetDrainage(CC.PixelIdxList{2:end}) = false;
-end
-
-% for debug
-
-% % For debug
-% clear all
-% INPUT_DIR = '../data/input';
-% dataFileName = 'b_IS_IT_PART_2015-11-18.mat';
-% dataFilePath = fullfile(INPUT_DIR,dataFileName);
-% load(dataFilePath);
-
+% for a test domain
 IS_IT_PART = false;
-IS_BND_INF = true;
-
 if IS_IT_PART == true
-    
-    % For debug for a part of DEM
+
+    % coordinates of the test domain
     tYMin = 558; tYMax = 658;
     tXMin = 117; tXMax = 168;
 
-    DEM = DEM(tYMin:tYMax,tXMin:tXMax);
-    [mRows,nCols] = size(DEM);
-    
-    if IS_BND_INF == true
-        
-        % for the domain filled with only elevations
-        nanMask = true(mRows,nCols);
-        nanMask(2:mRows-1,2:nCols-1) = false;
-        DEMArea = ~nanMask;
-        DEM(nanMask) = inf;
-
-        % extract the boundary of the target drainage
-        s = strel('square',3); % structural element when eroding image
-        eDEMArea = imerode(DEMArea,s); 
-        DEMAreaBnd = DEMArea & ~eDEMArea;
-        DEMAreaBndIdx = find(DEMAreaBnd);
-
-        % identify the coordinate of the outlet
-        DEMAreaBndElev = DEM(DEMAreaBndIdx);
-        [~,minElevIdx] = min(DEMAreaBndElev);
-        outletIdx = DEMAreaBndIdx(minElevIdx); % outlet on the boundary of drainage
-        [outletY,outletX] = ind2sub([mRows,nCols],outletIdx);
-
-        % Note that the elevation of the main outlet should be the lowest.
-        DEM(outletY,outletX) = min(DEM(:)) - 0.1;
-        
-        % define target drainage
-        targetDrainage = (~nanMask);
-        targetDrainage(outletY,outletX) = false;
-        
-    else
-        
-        % for the domain filled with only elevations
-        nanMask = true(mRows,nCols);
-        nanMask(2:mRows-1,2:nCols-1) = false;
-        DEMArea = ~nanMask;
-        DEM(nanMask) = 0;
-        
-        % define target drainage
-        targetDrainage = (~nanMask);
-        
-    end
-    
-    [steepestDescentSlope,slopeAllNbr,SDSFlowDirection,SDSNbrY,SDSNbrX] ...
-        = CalcSDSFlow(DEM,dX,dY);
-    % flatRegMap = ProcessFlat(DEM,targetDrainage,slopeAllNbr);
-    
     % for debug
     figure(3); clf;
     set(gcf, 'Color',[1,1,1]);
@@ -267,10 +109,67 @@ if IS_IT_PART == true
     imagesc(DEM);
     set(gca,'DataAspectRatio',[1 1 1]);
     colorbar;
-    title('Digital Elevation Model');
+    title('DEM of the test domain');
+
+end
+
+% define a target drainage according to the type of DEM
+IS_ISLAND = false;
+IS_BND_INF = true;
+LOCATE_OUTLET = true;
+
+bndMask = true(mRows,nCols);
+bndMask(2:mRows-1,2:nCols-1) = false;
+
+if IS_ISLAND == true
+
+    % for the domain surrouned by null values
+    targetDrainage = (~nanMask); % target drainage
+    DEM(~targetDrainage) = inf;
+
+else % IS_ISLAND == false
+
+    % for the domain filled with only elevations
+    targetDrainage = (~nanMask); % target drainage
+    DEM(bndMask) = inf;
+
+end
+
+if IS_BND_INF == false
+
+    % for the lower boundary
+    DEM(bndMask) = min(min(DEM(targetDrainage))) - 1;
+
+end
+
+if LOCATE_OUTLET == true
+
+    % locate the outlet of the target drainage
+
+    % extract the boundary of the target drainage
+    s = strel('square',3); % structural element when eroding image
+    dilatedTarget = imerode(targetDrainage,s); 
+    targetBnd = targetDrainage & ~dilatedTarget;
+    targetBndIdx = find(targetBnd);
+
+    % identify the coordinate of the outlet
+    targetBndElev = DEM(targetBndIdx);
+    [~,minElevIdx] = min(targetBndElev);
+    outletIdx = targetBndIdx(minElevIdx); % outlet on the boundary of drainage
+    [outletY,outletX] = ind2sub([mRows,nCols],outletIdx);
+
+    % Note that the elevation of the main outlet should be the lowest.
+    DEM(outletY,outletX) = min(DEM(:)) - 0.1;
+
+    % locate outlet of target drainage
+    targetDrainage(outletY,outletX) = false;
     
 end
 
+[steepestDescentSlope,slopeAllNbr,SDSFlowDirection,SDSNbrY,SDSNbrX] ...
+    = CalcSDSFlow(DEM,dX,dY);
+
+%% Process sinks
 % Identify depressions and their outlets, then modify each depression
 % outlet's flow direction to go downstream when flows are overspilled
 % over the depression
