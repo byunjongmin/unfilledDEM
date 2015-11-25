@@ -45,7 +45,7 @@ figure(1); clf;
 imagesc(DEM);
 set(gca,'DataAspectRatio',[1 1 1]);
 colorbar;
-title('Smoothed Digital Elevation Model');
+title('Digital Elevation Model');
 
 %% Check and remove flat cells in DEM
 
@@ -68,7 +68,7 @@ while afterNFlat > 0
         
     % add small random elevation values to DEM
     randE = rand(mRows,nCols);
-    DEM = DEM + randE;
+    DEM = DEM + randE * 0.001;
 
     % update elevation values only for the flat cells
     DEM(flatRegMap == true) = DEM(flatRegMap == true);
@@ -116,7 +116,7 @@ end
 % define a target drainage according to the type of DEM
 IS_ISLAND = false;
 IS_BND_INF = true;
-LOCATE_OUTLET = true;
+LOCATE_OUTLET = false;
 
 bndMask = true(mRows,nCols);
 bndMask(2:mRows-1,2:nCols-1) = false;
