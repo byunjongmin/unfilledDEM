@@ -60,13 +60,11 @@ title('Digital Elevation Model');
 % identify flat cells in DEM
 
 % assign flow directions to the DEM using D8 algorithm
-% note that, to use CalcSDSFlow function, elevation of outer region of the
-% target drainage should be inf.
-nanMask = (DEM == 32767 | DEM == -9999);
-DEM(nanMask) = inf;
 [steepestDescentSlope,slopeAllNbr,SDSFlowDirection,SDSNbrY,SDSNbrX] ...
     = CalcSDSFlow(DEM,dX,dY);
 % make a map of flat cells
+nanMask = (DEM == 32767 | DEM == -9999); % avoid null values of DEM
+nanMask(DEM == 0) = true; % include 0 as null value
 flatRegMap = ProcessFlat(DEM,~nanMask,slopeAllNbr);
 
 % add small random elevation values to DEM
@@ -87,18 +85,24 @@ h = 1/sum(h(:)) * h;
 % smooth using the filter
 DEM = filter2(h,DEM);
 
-% for debug
+% display difference between the original and smoothed dEM
 diffDEM = orgDEM - DEM;
 
 figure(2); clf;
-imagesc(diffDEM(fSize*2:end-fSize*2,fSize*2:end-fSize*2));
+
+subplot(1,2,1);
+imagesc(flatRegMap(fSize*2:end-fSize*2,fSize*2:end-fSize*2));
 set(gca,'DataAspectRatio',[1 1 1]);
 colorbar;
 title('Flat cells in DEM');
 
-%% Define target drainage
+subplot(1,2,2);
+imagesc(diffDEM(fSize*2:end-fSize*2,fSize*2:end-fSize*2));
+set(gca,'DataAspectRatio',[1 1 1]);
+colorbar;
+title('Difference between the original and smoothed DEM');
 
-% for a test domain
+%% for a test domain
 IS_IT_PART = false;
 if IS_IT_PART == true
 
@@ -106,6 +110,12 @@ if IS_IT_PART == true
     tYMin = 558; tYMax = 658;
     tXMin = 117; tXMax = 168;
 
+    DEM = DEM(tYMin:tYMax,tXMin:tXMax);
+    [mRows,nCols] = size(DEM);
+    
+    nanMask = (DEM == 32767 | DEM == -9999); % avoid null values of DEM
+    nanMask(DEM == 0) = true; % include 0 as null value
+    
     % for debug
     figure(3); clf;
     set(gcf, 'Color',[1,1,1]);
@@ -114,41 +124,24 @@ if IS_IT_PART == true
     set(gca,'DataAspectRatio',[1 1 1]);
     colorbar;
     title('DEM of the test domain');
-
+    
 end
 
-% define a target drainage according to the type of DEM
-IS_ISLAND = false;
-IS_BND_INF = true;
-LOCATE_OUTLET = false;
+%% Define target drainage and treat boundaries of DEM
+% note that you can choose whether the boundaries are higher or lower
 
-bndMask = true(mRows,nCols);
-bndMask(2:mRows-1,2:nCols-1) = false;
+% first, include the area out of nanMask
+targetDrainage = (~nanMask); % target drainage
 
-if IS_ISLAND == true
+IS_BND_LOWER = true;
 
-    % for the domain surrouned by null values
-    targetDrainage = (~nanMask); % target drainage
-    DEM(~targetDrainage) = inf;
+if IS_BND_LOWER == false
+    
+    DEM(~targetDrainage) = min(DEM(targetDrainage)) - 0.1;
+    
+else % IS_BND_HIGHER
 
-else % IS_ISLAND == false
-
-    % for the domain filled with only elevations
-    targetDrainage = (~nanMask); % target drainage
-    DEM(bndMask) = inf;
-
-end
-
-if IS_BND_INF == false
-
-    % for the lower boundary
-    DEM(bndMask) = min(min(DEM(targetDrainage))) - 1;
-
-end
-
-if LOCATE_OUTLET == true
-
-    % locate the outlet of the target drainage
+    % pick the outlet of the target drainage
 
     % extract the boundary of the target drainage
     s = strel('square',3); % structural element when eroding image

@@ -1,13 +1,12 @@
 function [steepestDescentSlope,slopeAllNbr,SDSFlowDirection ...
-    ,SDSNbrY,SDSNbrX] ...
-    = CalcSDSFlow(DEM,dX,dY)
+    ,SDSNbrY,SDSNbrX] = CalcSDSFlow(DEM,dX,dY)
 % @file CalcSDSFlow.m
 % @brief Calculate flow direction at each cell based on the steepest
 %   descent slope method
 %
 % @section INTRO CalcSDSFlow
 %
-% @version 0.1
+% @version 0.1.5 / 2015-11-26
 %
 % @retval steepestDescentSlope: steepest descent slope
 % @retval slopeAllNbr: all slope values of 8 neighbors
@@ -23,25 +22,21 @@ function [steepestDescentSlope,slopeAllNbr,SDSFlowDirection ...
 
 % Constants
 [mRows,nCols] = size(DEM);
-Y = mRows - 2;
-X = nCols - 2;
-Y_TOP_BND = 1;
-Y_BOTTOM_BND = mRows;
-Y_INI = 2;
-Y_MAX = Y+1;
-X_LEFT_BND = 1;
-X_RIGHT_BND = nCols;
-X_INI = 2;
-X_MAX = X+1;
+Y = mRows - 2; X = nCols - 2;
+Y_TOP_BND = 1; Y_BOTTOM_BND = mRows;
+Y_INI = 2; Y_MAX = Y+1;
+X_LEFT_BND = 1; X_RIGHT_BND = nCols;
+X_INI = 2; X_MAX = X+1;
 
 QUARTER_PI = 0.785398163397448;     % pi * 0.25
-ROOT2 = 1.41421356237310;           % sqrt(2)
-DISTANCE_RATIO_TO_NBR = [1 ROOT2 1 ROOT2 1 ROOT2 1 ROOT2];
+DIAGONAL_DIST = sqrt(dX^2 + dY^2);
+DISTANCE_TO_NBR = [dX,DIAGONAL_DIST,dY,DIAGONAL_DIST ...
+                    ,dX,DIAGONAL_DIST,dY,DIAGONAL_DIST];
 
 [arrayX,arrayY] ...
     = meshgrid(X_LEFT_BND:X_RIGHT_BND,Y_TOP_BND:Y_BOTTOM_BND);
 
-% Notet that calculation is performed within the boundary
+% Note that calculation is performed within the boundary
 [sArrayX,sArrayY] = meshgrid(X_INI:X_MAX,Y_INI:Y_MAX);
 
 % matrix of local cell(e0) index
@@ -55,10 +50,10 @@ s3IthNbrLinearIndicies = zeros(Y,X,8);
 ithNbrYOffset = [0 -1 -1 -1  0  1  1  1];
 ithNbrXOffset = [1  1  0 -1 -1 -1  0  1];
 
-for ithDir = 1:8    
-    s3IthNbrLinearIndicies(:,:,ithDir) ...
+for i = 1:8    
+    s3IthNbrLinearIndicies(:,:,i) ...
         = e0LinearIndicies(sE0LinearIndicies ...
-        + (ithNbrXOffset(ithDir) * mRows + ithNbrYOffset(ithDir)));
+        + (ithNbrXOffset(i) * mRows + ithNbrYOffset(i)));
 end
 
 SDSFlowDirection = nan(mRows,nCols);
@@ -75,30 +70,26 @@ sE0Elevation = DEM(sE0LinearIndicies);
 initialNbrX = sSDSNbrX;
 initialNbrY = sSDSNbrY;
 
-for ithNbr = 1:8
+for i = 1:8
 
-    sKthNbrElevation = DEM(s3IthNbrLinearIndicies(:,:,ithNbr));
+    sKthNbrElevation = DEM(s3IthNbrLinearIndicies(:,:,i));
 
-    sKthNbrSlope = (sE0Elevation - sKthNbrElevation) ...
-    / double((DISTANCE_RATIO_TO_NBR(ithNbr) * dX));
+    sKthNbrSlope = (sE0Elevation - sKthNbrElevation) / DISTANCE_TO_NBR(i);
 
-    slopeAllNbr(Y_INI:Y_MAX,X_INI:X_MAX, ithNbr) = sKthNbrSlope;
+    slopeAllNbr(Y_INI:Y_MAX,X_INI:X_MAX,i) = sKthNbrSlope;
 
     biggerSlope = sKthNbrSlope > sSteepestDescentSlope;
 
-    sSDSNbrY(biggerSlope) = initialNbrY(biggerSlope) ...
-        + ithNbrYOffset(ithNbr);
-    sSDSNbrX(biggerSlope) = initialNbrX(biggerSlope) ...
-        + ithNbrXOffset(ithNbr);
+    sSDSNbrY(biggerSlope) = initialNbrY(biggerSlope) + ithNbrYOffset(i);
+    sSDSNbrX(biggerSlope) = initialNbrX(biggerSlope) + ithNbrXOffset(i);
     
     possitiveSlope = sKthNbrSlope > 0;
 
-    sSDSFlowDirection(biggerSlope & possitiveSlope) ...
-      = (ithNbr-1) * QUARTER_PI;
+    sSDSFlowDirection(biggerSlope & possitiveSlope) = (i-1) * QUARTER_PI;
 
     sSteepestDescentSlope(biggerSlope) = sKthNbrSlope(biggerSlope);
 
-end % for ithNbr = 1:8
+end % for i = 1:8
 
 SDSFlowDirection(Y_INI:Y_MAX,X_INI:X_MAX) = sSDSFlowDirection;
 steepestDescentSlope(Y_INI:Y_MAX,X_INI:X_MAX) = sSteepestDescentSlope;
