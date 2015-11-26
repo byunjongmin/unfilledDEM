@@ -3,7 +3,7 @@ function main
 % @brief Function to extract stream longitudinal profiles from unfilled
 % DEMs
 %
-% @version 0.4.0 / 2015-11-25
+% @version 0.4.5 / 2015-11-26
 % @author Jongmin Byun
 %==========================================================================
 
@@ -41,53 +41,57 @@ end
 
 DEM = double(DEM);
 
+% % for the MATLAB without MappingToolbox
+% dataFileName = 'a_load_DEM_2015-11-25.mat';
+% dataFilePath = fullfile(INPUT_DIR,dataFileName);
+% load(dataFilePath);
+
 figure(1); clf;
 imagesc(DEM);
 set(gca,'DataAspectRatio',[1 1 1]);
 colorbar;
 title('Digital Elevation Model');
 
-%% Check and remove flat cells in DEM
+%% Check and remove flat cells in DEM based on smoothing
 
-% Assign flow directions to the DEM using D8 algorithm
-% Note that, to use CalcSDSFlow function, elevation of outer region of the
+% % for debug
+% DEM = orgDEM;
+
+% identify flat cells in DEM
+
+% assign flow directions to the DEM using D8 algorithm
+% note that, to use CalcSDSFlow function, elevation of outer region of the
 % target drainage should be inf.
 nanMask = (DEM == 32767 | DEM == -9999);
 DEM(nanMask) = inf;
 [steepestDescentSlope,slopeAllNbr,SDSFlowDirection,SDSNbrY,SDSNbrX] ...
     = CalcSDSFlow(DEM,dX,dY);
-
-% identify flat cells in DEM
+% make a map of flat cells
 flatRegMap = ProcessFlat(DEM,~nanMask,slopeAllNbr);
 
+% add small random elevation values to DEM
 orgDEM = DEM; % original DEM
-afterNFlat = inf;
-while afterNFlat > 0
+randE = rand(mRows,nCols);
+DEM = DEM + randE * 0.00001;
 
-    fprintf('The number of remaining flat cells is %4.0f\n',afterNFlat);
-        
-    % add small random elevation values to DEM
-    randE = rand(mRows,nCols);
-    DEM = DEM + randE * 0.001;
+% smooth DEM
 
-    % update elevation values only for the flat cells
-    DEM(flatRegMap == true) = DEM(flatRegMap == true);
-
-    [steepestDescentSlope,slopeAllNbr,SDSFlowDirection,SDSNbrY,SDSNbrX] ...
-        = CalcSDSFlow(DEM,dX,dY);
-
-    flatRegMap = ProcessFlat(DEM,~nanMask,slopeAllNbr);
-
-    % update the number of flat cells in DEM
-    afterNFlat = numel(find(flatRegMap == true));
-    
+% bell shaped weight window
+fSize = 4; % radius of window
+dCon = 0.01; % decay constant
+h = ones(fSize*2-1,fSize*2-1);
+for i = 1:fSize
+    h(i:end-(i-1),i:end-(i-1)) = dCon^(fSize-i);
 end
+h = 1/sum(h(:)) * h;
+% smooth using the filter
+DEM = filter2(h,DEM);
 
 % for debug
 diffDEM = orgDEM - DEM;
 
 figure(2); clf;
-imagesc(diffDEM);
+imagesc(diffDEM(fSize*2:end-fSize*2,fSize*2:end-fSize*2));
 set(gca,'DataAspectRatio',[1 1 1]);
 colorbar;
 title('Flat cells in DEM');
