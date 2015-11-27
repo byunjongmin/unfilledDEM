@@ -17,7 +17,7 @@ function slopePerDist = CalcSlope(considerNbr,distFromInit ...
 %
 %	slopePerDist
 %
-% Version: 0.1.1 / 2011-11-19
+% Version: 0.1.2 / 2015-11-27
 %
 
 % define variables
@@ -27,12 +27,13 @@ slopePerDist = zeros(nCells,nCNbr);
 
 % calculate slope values
 
-% remove depressions in an input stram profile
-for i = nCells:-1:2
-    if streamProfElev(i-1) <= streamProfElev(i)
-        streamProfElev(i-1) = streamProfElev(i) + 0.000001;
-    end
-end
+% % if you do not want negative slope values, remove depressions in an input
+% % stram profile
+% for i = nCells:-1:2
+%     if streamProfElev(i-1) <= streamProfElev(i)
+%         streamProfElev(i-1) = streamProfElev(i) + 0.000001;
+%     end
+% end
 
 % calculate slope values
 for ithDist = 1:nCNbr

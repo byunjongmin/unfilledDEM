@@ -3,7 +3,7 @@ function main
 % @brief Function to extract stream longitudinal profiles from unfilled
 % DEMs
 %
-% @version 0.5.0 / 2015-11-26
+% @version 0.5.1 / 2015-11-26
 % @author Jongmin Byun
 %==========================================================================
 
@@ -41,45 +41,39 @@ end
 
 DEM = double(DEM);
 
+% mark a mask of nan
 nanMask = (DEM == 32767 | DEM == -9999); % avoid null values of DEM
 nanMask(DEM == 0) = true; % include 0 as null value
 orgDEM = DEM; % original DEM
-DEM(nanMask) = nan;
 
+% draw DEM
 figure(1); clf;
+
+DEM(nanMask) = nan;
 imagesc(DEM);
+DEM(nanMask) = orgDEM(nanMask);
+
 set(gca,'DataAspectRatio',[1 1 1]);
 colorbar;
 title('Digital Elevation Model');
-DEM(nanMask) = orgDEM(nanMask);
 
-% Check and remove flat cells in DEM based on smoothing
+%% Remove flat cells in DEM by adding random elevation values and smoothing
+% using a specific filter
 
 % % for the MATLAB without MappingToolbox
 % dataFileName = 'a_load_DEM_2015-11-26.mat';
 % dataFilePath = fullfile(INPUT_DIR,dataFileName);
 % load(dataFilePath);
 
-% identify flat cells in DEM
-
-% assign flow directions to the DEM using D8 algorithm
-minElev = min(DEM(~nanMask));
-DEM(nanMask) = minElev - 1; % for the calculation of the model boundary
-[steepestDescentSlope,slopeAllNbr,SDSFlowDirection,SDSNbrY,SDSNbrX] ...
-    = CalcSDSFlow(DEM,dX,dY);
-DEM(nanMask) = minElev + 1;
-% make a map of flat cells
-flatRegMap = ProcessFlat(DEM,~nanMask,slopeAllNbr);
-
 % add small random elevation values to DEM
+
 randE = rand(mRows,nCols);
 DEM = DEM + randE * 0.00001;
 
 % smooth DEM
-
 % bell shaped weight window
-fSize = 4; % radius of window
-dCon = 0.01; % decay constant
+fSize = 2; % radius of window
+dCon = 1; % decay constant
 h = ones(fSize*2-1,fSize*2-1);
 for i = 1:fSize
     h(i:end-(i-1),i:end-(i-1)) = dCon^(fSize-i);
@@ -89,6 +83,25 @@ h = 1/sum(h(:)) * h;
 nSmooth = 1;
 for i=1:nSmooth
     DEM = filter2(h,DEM);
+end
+
+% check whether flat cells are removed
+
+% assign flow directions to the DEM using D8 algorithm
+% note that, for the calculation of flow direction for the target domain,
+% fill nan mask area with lower elevation values
+minElev = min(DEM(~nanMask));
+DEM(nanMask) = minElev - 1;
+[steepestDescentSlope,slopeAllNbr,SDSFlowDirection,SDSNbrY,SDSNbrX] ...
+    = CalcSDSFlow(DEM,dX,dY);
+DEM(nanMask) = minElev + 1;
+
+% make a map of flat cells
+flatRegMap = ProcessFlat(DEM,~nanMask,slopeAllNbr);
+
+nFlatCells = sum(flatRegMap(:));
+if nFlatCells > 0
+    error('Error. There remain flat cells in DEM\n');
 end
 
 % display difference between the original and smoothed dEM
@@ -116,10 +129,14 @@ if IS_IT_PART == true
     % coordinates of the test domain
     tYMin = 558; tYMax = 658;
     tXMin = 117; tXMax = 168;
-
-    DEM = DEM(tYMin:tYMax,tXMin:tXMax);
+    
+    % cut DEM
+    orgDEM = DEM(tYMin:tYMax,tXMin:tXMax); % original DEM
+    DEM = DEM(tYMin:tYMax,tXMin:tXMax); % smoothed DEM
+    
     [mRows,nCols] = size(DEM);
     
+    % mark a mask of nan
     nanMask = (DEM == 32767 | DEM == -9999); % avoid null values of DEM
     nanMask(DEM == 0) = true; % include 0 as null value
     
@@ -127,7 +144,10 @@ if IS_IT_PART == true
     figure(3); clf;
     set(gcf, 'Color',[1,1,1]);
 
+    DEM(nanMask) = nan;
     imagesc(DEM);
+    DEM(nanMask) = orgDEM(nanMask);
+    
     set(gca,'DataAspectRatio',[1 1 1]);
     colorbar;
     title('DEM of the test domain');
@@ -170,6 +190,8 @@ else % IS_BND_LOWER == false
     targetDrainage(outletY,outletX) = false;
     
 end
+
+%% Assign flow direction to the target area in DEM using D8 algorithm
 
 [steepestDescentSlope,slopeAllNbr,SDSFlowDirection,SDSNbrY,SDSNbrX] ...
     = CalcSDSFlow(DEM,dX,dY);
@@ -300,9 +322,9 @@ set(gca,'YTick',[],'XTick' ,[])
 colormap(flipud(colormap(gray)))
 colorbar
 
-%% extract and analyze stream longitudinal profiles
+%% Extract and analyze stream longitudinal profiles
 
-%% draw a stream longitudinal profile on the interesting stream path
+%% Draw a stream longitudinal profile on the interesting stream path
 
 % % for debug
 % clear all
@@ -310,23 +332,26 @@ colorbar
 % dataFileName = 'a_CalcUpstreamCells_2015-11-26.mat';
 % dataFilePath = fullfile(INPUT_DIR,dataFileName);
 % load(dataFilePath);
+% 
+% figure(9); clf;
+% set(gcf, 'Color',[1,1,1]);
+% 
+% imagesc(DEM);
+% set(gca,'DataAspectRatio',[1 1 1]);
+% colorbar;
+% title('Digital Elevation Model');
 
-figure(9); clf;
-set(gcf, 'Color',[1,1,1]);
-
-imagesc(DEM);
-set(gca,'DataAspectRatio',[1 1 1]);
-colorbar;
-title('Digital Elevation Model');
-
-% identify stream path using given initial and end point coordinates
+% input the initiation and end point for a profile
 initY = 617; initX = 719;
 endY = 853; endX = 297;
+
+% identify stream path using given initial and end point coordinates
 [streamPath,distFromInit] = RecordStrPath(initY,initX,endY,endX ...
     ,mRows,nCols,m2SDSNbrY,m2SDSNbrX,dY,dX);
 
 % stream longitudinal profile using raw DEM
-elev = orgDEM(streamPath(:));
+% note that we use the original DEM
+profElev = orgDEM(streamPath(:));
 nCells = numel(streamPath);
 
 % draw figure
@@ -334,47 +359,51 @@ figure(10); clf;
 set(gcf, 'Color',[1,1,1]);
 
 subplot(3,1,1)
-stairs(distFromInit,elev);
+stairs(distFromInit,profElev);
 
 % grid on
 title('Longitudinal Stream Profile')
 xlabel('Distance From Divide [m]')
 ylabel('Elevation [m]')
 xlim([0 distFromInit(end)])
-ylim([min(elev),max(elev)])
+ylim([min(profElev),max(profElev)])
 
 %% smoothing stream profiles
+% note that, if you input multiple values, you can compare the differences
+% due to the number of considering neighbor cells
 
 considerNbrForElev = [25,50,75,100]; % number of considering neighbor cells
-% note that you can compare the differences due to the number of
-% considering neighbor cells
 nCNbr = numel(considerNbrForElev); % number of cases
 
-smoothedElev = SmoothingElev(considerNbrForElev,distFromInit,DEM,streamPath);
+smoothedProfElev = SmoothingElev(considerNbrForElev,distFromInit,DEM,streamPath);
 
 subplot(3,1,2)
 
 cc = jet(nCNbr);
 for ithLine = 1:nCNbr
-    plot(distFromInit,smoothedElev(:,ithLine),'color',cc(ithLine,:));
+    plot(distFromInit,smoothedProfElev(:,ithLine),'color',cc(ithLine,:));
     hold on
 end
 
 grid on
-title('Longitudinal Stream Profile')
+title('Smoothed Longitudinal Stream Profile')
 xlabel('Distance From Divide [m]')
 ylabel('Elevation [m]')
 xlim([0 distFromInit(end)])
-ylim([min(elev),max(elev)])
+ylim([min(profElev),max(profElev)])
 
-%% draw stream gradient
+%% Draw stream gradient
 
+% chose base elevation of profile
+inputProfElev = smoothedProfElev;
+chosenProfile = 1;
+
+% set the number of considered neighbor
 considerNbrForSlope = [25,50,75,100];
-chosenSizeForSlope = 1;
 nCNbrForSlope = numel(considerNbrForSlope);
 
-slopePerDist = CalcSlope(considerNbrForSlope,distFromInit,smoothedElev ...
-    ,chosenSizeForSlope);
+slopePerDist = CalcSlope(considerNbrForSlope,distFromInit,inputProfElev ...
+    ,chosenProfile);
 
 subplot(3,1,3)
 
@@ -385,11 +414,12 @@ for ithLine = 1:nCNbrForSlope
 end
 
 grid on
-title('Stream Gradient Profile')
+title('Stream Gradient')
 xlabel('Distance From Initiaion [m]')
 ylabel('Slope')
 xlim([0 distFromInit(end)])
 ylim([min(slopePerDist(:,1)),max(slopePerDist(:,1))])
+
 
 %% draw corrected upstream area profiles on the interesting stream paths
 
@@ -483,12 +513,12 @@ ExportRasterAsArcGrid(IPDFDFilePath,ithProfileDistMap,R.DeltaX ...
 % contour interval
 contInterval = 1; % contour interval
 % fixed vertical interval
-ipElevMin = 10 * floor(0.1 * elev(end));
-ipElevMax = 10 * ceil(0.1 * elev(1));
+ipElevMin = 10 * floor(0.1 * profElev(end));
+ipElevMax = 10 * ceil(0.1 * profElev(1));
 ipElev = ipElevMax:-contInterval:ipElevMin;
 
 % interpolated distance values according to fixed vertical interval
-tStrProfElev = elev;
+tStrProfElev = profElev;
 % remove depressions in an input stream profile.
 nCells = numel(distFromInit);
 for a = nCells:-1:2
