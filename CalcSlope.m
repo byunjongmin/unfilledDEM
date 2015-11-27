@@ -45,9 +45,9 @@ for ithDist = 1:nCNbr
 
     slopePerDist(1,ithDist) = (firstElev - secondElev) / distBtwCells;
     
-    if slopePerDist(1,ithDist) <= 0.000001 * 2 / distBtwCells
-        slopePerDist(1,ithDist) = nan;
-    end
+%     if slopePerDist(1,ithDist) <= 0.000001 * 2 / distBtwCells
+%         slopePerDist(1,ithDist) = nan;
+%     end
 
     % end node: backward difference
     firstElev = streamProfElev(nCells-1,ithProf);
@@ -56,9 +56,9 @@ for ithDist = 1:nCNbr
 
     slopePerDist(nCells,ithDist) = (firstElev - secondElev) / distBtwCells;
     
-    if slopePerDist(nCells,ithDist) <= 0.000001 * 2 / distBtwCells
-        slopePerDist(nCells,ithDist) = nan;
-    end
+%     if slopePerDist(nCells,ithDist) <= 0.000001 * 2 / distBtwCells
+%         slopePerDist(nCells,ithDist) = nan;
+%     end
     
 	% boundary nodes: central difference with variable ranges
 	if considerNbr(ithDist) > 1
@@ -75,9 +75,9 @@ for ithDist = 1:nCNbr
 	        distBtwCells = distFromInit(secondEdge) - distFromInit(firstEdge);
 	        slopePerDist(ithCell,ithDist) = (firstElev - secondElev) / distBtwCells;
             
-            if slopePerDist(ithCell,ithDist) <= 0.000001 * (secondEdge - firstEdge) / distBtwCells
-                slopePerDist(ithCell,ithDist) = nan;
-            end
+%             if slopePerDist(ithCell,ithDist) <= 0.000001 * (secondEdge - firstEdge) / distBtwCells
+%                 slopePerDist(ithCell,ithDist) = nan;
+%             end
 
 	    end
 
@@ -93,9 +93,9 @@ for ithDist = 1:nCNbr
 	        distBtwCells = distFromInit(secondEdge) - distFromInit(firstEdge);
 	        slopePerDist(ithCell,ithDist) = (firstElev - secondElev) / distBtwCells;
             
-            if slopePerDist(ithCell,ithDist) <= 0.000001 * (secondEdge - firstEdge) / distBtwCells
-                slopePerDist(ithCell,ithDist) = nan;
-            end
+%             if slopePerDist(ithCell,ithDist) <= 0.000001 * (secondEdge - firstEdge) / distBtwCells
+%                 slopePerDist(ithCell,ithDist) = nan;
+%             end
 
 	    end
     
@@ -113,9 +113,9 @@ for ithDist = 1:nCNbr
         distBtwCells = distFromInit(secondEdge) - distFromInit(firstEdge);
         slopePerDist(ithCell,ithDist) = (firstElev - secondElev) / distBtwCells;
         
-        if slopePerDist(ithCell,ithDist) <= 0.000001 * (secondEdge - firstEdge) / distBtwCells
-            slopePerDist(ithCell,ithDist) = nan;
-        end
+%         if slopePerDist(ithCell,ithDist) <= 0.000001 * (secondEdge - firstEdge) / distBtwCells
+%             slopePerDist(ithCell,ithDist) = nan;
+%         end
 	        
     end
 

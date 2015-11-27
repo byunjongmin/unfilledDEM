@@ -73,10 +73,10 @@ DEM = DEM + randE * 0.00001;
 % smooth DEM
 % bell shaped weight window
 fSize = 2; % radius of window
-dCon = 1; % decay constant
+transRatio = 1; % ratio of transfering values to next neighbors
 h = ones(fSize*2-1,fSize*2-1);
 for i = 1:fSize
-    h(i:end-(i-1),i:end-(i-1)) = dCon^(fSize-i);
+    h(i:end-(i-1),i:end-(i-1)) = transRatio^(fSize-i);
 end
 h = 1/sum(h(:)) * h;
 % smooth using the filter
@@ -293,7 +293,7 @@ subplot(1,3,1)
 imagesc(nUpstreamCellsWithFldReg(2:end-1,2:end-1));
 title('Upstream Cells No. with Depressions');
 axis image
-set(gca,'YTick',[],'XTick' ,[])
+% set(gca,'YTick',[],'XTick' ,[])
 colormap(flipud(colormap(gray)))
 colorbar
 
@@ -301,7 +301,7 @@ subplot(1,3,2)
 imagesc(nUpstreamCells(2:end-1,2:end-1));
 title('Upstream Cells No.');
 axis image
-set(gca,'YTick',[],'XTick' ,[])
+% set(gca,'YTick',[],'XTick' ,[])
 colormap(flipud(colormap(gray)))
 colorbar
 
@@ -309,7 +309,7 @@ subplot(1,3,3)
 imagesc(log(nUpstreamCells(2:end-1,2:end-1)));
 title('Upstream Cells No. [Log]');
 axis image
-set(gca,'YTick',[],'XTick' ,[])
+% set(gca,'YTick',[],'XTick' ,[])
 colormap(flipud(colormap(gray)))
 colorbar
 
@@ -318,7 +318,7 @@ set(gcf,'Color',[1 1 1])
 imagesc(nUpstreamCells(2:end-1,2:end-1));
 title('Upstream Cells No.');
 axis image
-set(gca,'YTick',[],'XTick' ,[])
+% set(gca,'YTick',[],'XTick' ,[])
 colormap(flipud(colormap(gray)))
 colorbar
 
@@ -326,24 +326,26 @@ colorbar
 
 %% Draw a stream longitudinal profile on the interesting stream path
 
-% % for debug
-% clear all
-% INPUT_DIR = '../data/input';
-% dataFileName = 'a_CalcUpstreamCells_2015-11-26.mat';
-% dataFilePath = fullfile(INPUT_DIR,dataFileName);
-% load(dataFilePath);
-% 
-% figure(9); clf;
-% set(gcf, 'Color',[1,1,1]);
-% 
-% imagesc(DEM);
-% set(gca,'DataAspectRatio',[1 1 1]);
-% colorbar;
-% title('Digital Elevation Model');
+% for debug
+clear all
+INPUT_DIR = '../data/input';
+dataFileName = 'SRTM_1_dCon_0.5_20151126.mat';
+dataFilePath = fullfile(INPUT_DIR,dataFileName);
+load(dataFilePath);
+
+% draw DEM
+figure(9); clf;
+set(gcf, 'Color',[1,1,1]);
+
+imagesc(DEM);
+set(gca,'DataAspectRatio',[1 1 1]);
+colorbar;
+title('Digital Elevation Model');
 
 % input the initiation and end point for a profile
-initY = 617; initX = 719;
-endY = 853; endX = 297;
+
+initY = 717; initX = 2121;
+endY = 2995; endX = 1691;
 
 % identify stream path using given initial and end point coordinates
 [streamPath,distFromInit] = RecordStrPath(initY,initX,endY,endX ...
@@ -372,10 +374,10 @@ ylim([min(profElev),max(profElev)])
 % note that, if you input multiple values, you can compare the differences
 % due to the number of considering neighbor cells
 
-considerNbrForElev = [25,50,75,100]; % number of considering neighbor cells
-nCNbr = numel(considerNbrForElev); % number of cases
+considerNbrForProf = fSize*2-1; % number of considering neighbor cells
+nCNbr = numel(considerNbrForProf); % number of cases
 
-smoothedProfElev = SmoothingElev(considerNbrForElev,distFromInit,DEM,streamPath);
+smoothedProfElev = SmoothingElev(considerNbrForProf,distFromInit,DEM,streamPath);
 
 subplot(3,1,2)
 
@@ -399,7 +401,7 @@ inputProfElev = smoothedProfElev;
 chosenProfile = 1;
 
 % set the number of considered neighbor
-considerNbrForSlope = [25,50,75,100];
+considerNbrForSlope = 3:10:1000;
 nCNbrForSlope = numel(considerNbrForSlope);
 
 slopePerDist = CalcSlope(considerNbrForSlope,distFromInit,inputProfElev ...
@@ -420,11 +422,60 @@ ylabel('Slope')
 xlim([0 distFromInit(end)])
 ylim([min(slopePerDist(:,1)),max(slopePerDist(:,1))])
 
+% simple statistics of slopePerDist
+minSlopePerDist = zeros(1,nCNbrForSlope);
+maxSlopePerDist = zeros(1,nCNbrForSlope);
+meanSlopePerDist = zeros(1,nCNbrForSlope);
+stdSlopePerDist = zeros(1,nCNbrForSlope);
+
+for i=1:nCNbrForSlope
+    
+    minSlopePerDist(1,i) = min(slopePerDist(:,i));
+    maxSlopePerDist(1,i) = max(slopePerDist(:,i));
+    meanSlopePerDist(1,i) = mean(slopePerDist(:,i));
+    stdSlopePerDist(1,i) = std(slopePerDist(:,i));
+    
+end
+    
+figure(11); clf;
+
+subplot(2,2,1)
+scatter(considerNbrForSlope .* dX,minSlopePerDist);
+
+grid on
+title('Change in Minimum Stream Gradient')
+xlabel('Distance (Dd)')
+ylabel('Stream Gradient')
+
+subplot(2,2,2)
+scatter(considerNbrForSlope .* dX,maxSlopePerDist);
+
+grid on
+title('Change in Maximum Stream Gradient')
+xlabel('Distance (Dd)')
+ylabel('Stream Gradient')
+
+subplot(2,2,3)
+scatter(considerNbrForSlope .* dX,meanSlopePerDist);
+
+grid on
+title('Change in Mean Stream Gradient')
+xlabel('Distance (Dd)')
+ylabel('Stream Gradient')
+
+subplot(2,2,4)
+scatter(considerNbrForSlope .* dX,stdSlopePerDist);
+
+grid on
+title('Change in Standard Deviation Stream Gradient')
+xlabel('Distance (Dd)')
+ylabel('Standard Deviation')
+
 
 %% draw corrected upstream area profiles on the interesting stream paths
 
 % choose a stream gradient profile
-chosenSlopeForUpArea_Slope = 1;
+chosenSlopeForUpArea_Slope = 25;
 
 % calculate upstream area
 upstreamAreaProf = nUpstreamCells(streamPath(:)) .* dX .* dY;
@@ -437,7 +488,7 @@ isInitFirst = true;
 for ithCell = 2:nCells
     
     if upstreamAreaProf(ithCell) < prevUpArea
-        
+
         if isInitFirst == true
         
             initUpArea = prevUpArea;
@@ -488,16 +539,21 @@ xlim([upstreamAreaProf(1),upstreamAreaProf(end)])
 
 %% export stream gradient profile to ArcGIS
 
-fileName = strcat(num2str(initY),'_',num2str(initX),'_',num2str(endY),'_',num2str(endX),'_profile_gradient');
+ithStreamGradientMap = nan(mRows,nCols);
 
-ithProfileDistMap = nan(mRows,nCols);
-for ithCell = 1:nCells
-    ithProfileDistMap(streamPath(ithCell)) = slopePerDist(ithCell);    
+for i = 1:nCells
+    
+    ithStreamGradientMap(streamPath(i)) = slopePerDist(i,chosenSlopeForUpArea_Slope);    
+
 end
+
+fileName = strcat(num2str(initY),'_',num2str(initX),'_',num2str(endY),'_',num2str(endX),'_profile_gradient');
 % IPDFDFilePath = fullfile(OUTPUT_DIR,fileName);
-IPDFDFilePath = fullfile('/Users/cyberzen/Dropbox/temp',fileName);
-ExportRasterAsArcGrid(IPDFDFilePath,ithProfileDistMap,R.DeltaX ...
-    ,R.XLimWorld(1,1),R.YLimWorld(1,1));
+IPDFDFilePath = fullfile('/Volumes/DATA_BAK/WORKSPACE/Project/NewKnickPoints/Raster',fileName);
+
+% ithStreamGradientMap(isnan(ithStreamGradientMap)) = 32767;
+[~,R] = geotiffread(DEMFilePath);
+geotiffwrite(IPDFDFilePath,ithStreamGradientMap,R);
 
 %% Analyze slope-area relationship according to fixed vertical interval
 % note: errors in DEM produce many depressions and negative slope values
@@ -531,18 +587,19 @@ ipDistFromInit = interp1(tStrProfElev,distFromInit,ipElev);
 % draw new stream profile with both elevation with fixed vertical interval
 % and interpolated distance.
 
-figure(12);
-subplot(5,1,1)
-% for debug
-% plot(distFromInit,tStrProfElev,'o',ipDistFromInit,ipElev);
-plot(ipDistFromInit,ipElev);
+figure(12); clf;
 
-% grid on
-title('Longitudinal Stream Profile')
-xlabel('Distance From Divide [m]')
-ylabel('Elevation [m]')
-xlim([0 max(ipDistFromInit)])
-ylim([min(ipElev),max(ipElev)])
+% subplot(5,1,1)
+% % for debug
+% % plot(distFromInit,tStrProfElev,'o',ipDistFromInit,ipElev);
+% plot(ipDistFromInit,ipElev);
+% 
+% % grid on
+% title('Longitudinal Stream Profile')
+% xlabel('Distance From Divide [m]')
+% ylabel('Elevation [m]')
+% xlim([0 max(ipDistFromInit)])
+% ylim([min(ipElev),max(ipElev)])
 
 % calculate new slope values using interpolated elevation and distance data
 % note: basically new slope means local slope rather than 'trend slope'.
@@ -561,20 +618,20 @@ for a = nCells2
         / (ipDistFromInit(a) - ipDistFromInit(a-1));
 end
 
-% draw newly calculated slope vs distance relationship
-subplot(5,1,2)
-plot(ipDistFromInit,newSlope,'*')
-
-% grid on
-xlabel('Distance From Initiaion [m]')
-ylabel('Slope')
-xlim([0 max(ipDistFromInit)])
-ylim([min(newSlope),max(newSlope)])
+% % draw newly calculated slope vs distance relationship
+% subplot(5,1,2)
+% plot(ipDistFromInit,newSlope,'*')
+% 
+% % grid on
+% xlabel('Distance From Initiaion [m]')
+% ylabel('Slope')
+% xlim([0 max(ipDistFromInit)])
+% ylim([min(newSlope),max(newSlope)])
 
 % draw newly calculated upstream area vs elevation relationship
 ipUpstreamArea = interp1(tStrProfElev,upstreamAreaProf,ipElev);
 
-subplot(5,1,3)
+subplot(3,1,1)
 plot(ipDistFromInit,ipUpstreamArea);
 
 set(gca,'YScale','log');
@@ -587,7 +644,7 @@ xlim([0 max(ipDistFromInit)])
 ylim([min(ipUpstreamArea),max(ipUpstreamArea)])
 
 % draw newly calculated upstream area vs slope relationship
-subplot(5,1,4)
+subplot(3,1,2)
 scatter(ipUpstreamArea,newSlope,'m+')
 
 set(gca,'XScale','log','YScale','log');
@@ -599,7 +656,7 @@ xlim([min(ipUpstreamArea),max(ipUpstreamArea)])
 
 % determine logarithmic binned average slopes
 
-logBinSize = 0.1;
+logBinSize = 0.01;
 
 minPower = floor(log10(min(ipUpstreamArea))/logBinSize) * logBinSize;
 maxPower = ceil(log10(max(ipUpstreamArea))/logBinSize) * logBinSize;
@@ -629,7 +686,7 @@ end
 lbarea = tempArea(find(tempSlope));
 lbslope = tempSlope(find(tempSlope));
 
-subplot(5,1,5)
+subplot(3,1,3)
 loglog(lbarea,lbslope,'rs','MarkerFaceColor','r','MarkerSize',3)
 % grid on
 title('Upstream Area - Slope')
