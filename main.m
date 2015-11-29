@@ -326,26 +326,28 @@ colorbar
 
 %% Draw a stream longitudinal profile on the interesting stream path
 
-% for debug
-clear all
-INPUT_DIR = '../data/input';
-dataFileName = 'SRTM_1_dCon_0.5_20151126.mat';
-dataFilePath = fullfile(INPUT_DIR,dataFileName);
-load(dataFilePath);
-
-% draw DEM
-figure(9); clf;
-set(gcf, 'Color',[1,1,1]);
-
-imagesc(DEM);
-set(gca,'DataAspectRatio',[1 1 1]);
-colorbar;
-title('Digital Elevation Model');
+% % for debug
+% clear all
+% INPUT_DIR = '../data/input';
+% dataFileName = 'SRTM_1_dCon_0.5_20151126.mat';
+% dataFilePath = fullfile(INPUT_DIR,dataFileName);
+% load(dataFilePath);
+% 
+% % slopePerDistTotal = []; % for total sloperPerDist statistics
+% 
+% % draw DEM
+% figure(9); clf;
+% set(gcf, 'Color',[1,1,1]);
+% 
+% imagesc(DEM);
+% set(gca,'DataAspectRatio',[1 1 1]);
+% colorbar;
+% title('Digital Elevation Model');
 
 % input the initiation and end point for a profile
 
-initY = 717; initX = 2121;
-endY = 2995; endX = 1691;
+initY = 1539; initX = 1033;
+endY = 3181; endX = 1951;
 
 % identify stream path using given initial and end point coordinates
 [streamPath,distFromInit] = RecordStrPath(initY,initX,endY,endX ...
@@ -360,17 +362,18 @@ nCells = numel(streamPath);
 figure(10); clf;
 set(gcf, 'Color',[1,1,1]);
 
-subplot(3,1,1)
+subplot(4,1,1)
 stairs(distFromInit,profElev);
 
 % grid on
+set(gca,'FontSize',13,'fontWeight','bold')
 title('Longitudinal Stream Profile')
 xlabel('Distance From Divide [m]')
 ylabel('Elevation [m]')
 xlim([0 distFromInit(end)])
 ylim([min(profElev),max(profElev)])
 
-%% smoothing stream profiles
+% smoothing stream profiles
 % note that, if you input multiple values, you can compare the differences
 % due to the number of considering neighbor cells
 
@@ -379,7 +382,7 @@ nCNbr = numel(considerNbrForProf); % number of cases
 
 smoothedProfElev = SmoothingElev(considerNbrForProf,distFromInit,DEM,streamPath);
 
-subplot(3,1,2)
+subplot(4,1,2)
 
 cc = jet(nCNbr);
 for ithLine = 1:nCNbr
@@ -388,26 +391,27 @@ for ithLine = 1:nCNbr
 end
 
 grid on
+set(gca,'FontSize',13,'fontWeight','bold')
 title('Smoothed Longitudinal Stream Profile')
 xlabel('Distance From Divide [m]')
 ylabel('Elevation [m]')
 xlim([0 distFromInit(end)])
 ylim([min(profElev),max(profElev)])
 
-%% Draw stream gradient
+% Draw stream gradient
 
 % chose base elevation of profile
 inputProfElev = smoothedProfElev;
 chosenProfile = 1;
 
 % set the number of considered neighbor
-considerNbrForSlope = 3:10:1000;
+considerNbrForSlope = 3:10:500;
 nCNbrForSlope = numel(considerNbrForSlope);
-
+% 너무 크게 구간을 잡으면 연산이 안됨.
 slopePerDist = CalcSlope(considerNbrForSlope,distFromInit,inputProfElev ...
     ,chosenProfile);
 
-subplot(3,1,3)
+subplot(4,1,3)
 
 cc = jet(nCNbrForSlope);
 for ithLine = 1:nCNbrForSlope
@@ -416,57 +420,97 @@ for ithLine = 1:nCNbrForSlope
 end
 
 grid on
+set(gca,'FontSize',13,'fontWeight','bold')
 title('Stream Gradient')
 xlabel('Distance From Initiaion [m]')
 ylabel('Slope')
 xlim([0 distFromInit(end)])
 ylim([min(slopePerDist(:,1)),max(slopePerDist(:,1))])
 
+% Identify Knickpoints: Relative Slopes (Rd)
+
+% chose range for identify knickpoint
+initX_Knick = 16;
+endX_Knick = 31;
+
+x = considerNbrForSlope(initX_Knick:endX_Knick) .* 2 .* double(dX);
+
+Rd = nan(nCells,1);
+
+for ithCell = 1:nCells
+    
+    y = slopePerDist(ithCell,initX_Knick:endX_Knick);    
+    c = polyfit(x,y,1);
+    
+    Rd(ithCell,1) = -c(1);
+
+end
+
+subplot(4,1,4)
+
+plot(distFromInit,Rd);
+
+grid on
+set(gca,'FontSize',13,'fontWeight','bold')
+title('Relative Slope')
+xlabel('Distance From Divide [m]')
+ylabel('Relative Slope [m^-1]')
+xlim([0 distFromInit(end)])
+ylim([-0.1E-5,0.1E-5])
+
+
 % simple statistics of slopePerDist
-minSlopePerDist = zeros(1,nCNbrForSlope);
-maxSlopePerDist = zeros(1,nCNbrForSlope);
-meanSlopePerDist = zeros(1,nCNbrForSlope);
-stdSlopePerDist = zeros(1,nCNbrForSlope);
+slopePerDistMin = zeros(1,nCNbrForSlope);
+slopePerDistMax = zeros(1,nCNbrForSlope);
+slopePerDistMean = zeros(1,nCNbrForSlope);
+slopePerDistStd = zeros(1,nCNbrForSlope);
 
 for i=1:nCNbrForSlope
     
-    minSlopePerDist(1,i) = min(slopePerDist(:,i));
-    maxSlopePerDist(1,i) = max(slopePerDist(:,i));
-    meanSlopePerDist(1,i) = mean(slopePerDist(:,i));
-    stdSlopePerDist(1,i) = std(slopePerDist(:,i));
+    slopePerDistMin(1,i) = min(slopePerDist(:,i));
+    slopePerDistMax(1,i) = max(slopePerDist(:,i));
+    slopePerDistMean(1,i) = mean(slopePerDist(:,i));
+    slopePerDistStd(1,i) = std(slopePerDist(:,i));
     
 end
-    
+
+% slopePerDistTotal = [slopePerDistTotal...
+%     ;slopePerDistMin; slopePerDistMax; slopePerDistMean; slopePerDistStd];
+
 figure(11); clf;
 
 subplot(2,2,1)
-scatter(considerNbrForSlope .* dX,minSlopePerDist);
+scatter(considerNbrForSlope .* dX,slopePerDistMin);
 
 grid on
+set(gca,'FontSize',13,'fontWeight','bold')
 title('Change in Minimum Stream Gradient')
 xlabel('Distance (Dd)')
 ylabel('Stream Gradient')
 
 subplot(2,2,2)
-scatter(considerNbrForSlope .* dX,maxSlopePerDist);
+scatter(considerNbrForSlope .* dX,slopePerDistMax);
 
 grid on
+set(gca,'FontSize',13,'fontWeight','bold')
 title('Change in Maximum Stream Gradient')
 xlabel('Distance (Dd)')
 ylabel('Stream Gradient')
 
 subplot(2,2,3)
-scatter(considerNbrForSlope .* dX,meanSlopePerDist);
+scatter(considerNbrForSlope .* dX,slopePerDistMean);
 
 grid on
+set(gca,'FontSize',13,'fontWeight','bold')
 title('Change in Mean Stream Gradient')
 xlabel('Distance (Dd)')
 ylabel('Stream Gradient')
 
 subplot(2,2,4)
-scatter(considerNbrForSlope .* dX,stdSlopePerDist);
+scatter(considerNbrForSlope .* dX,slopePerDistStd);
 
 grid on
+set(gca,'FontSize',13,'fontWeight','bold')
 title('Change in Standard Deviation Stream Gradient')
 xlabel('Distance (Dd)')
 ylabel('Standard Deviation')
@@ -537,25 +581,7 @@ xlabel('Upstream Area [m^2]')
 ylabel('Slope')
 xlim([upstreamAreaProf(1),upstreamAreaProf(end)])
 
-%% export stream gradient profile to ArcGIS
-
-ithStreamGradientMap = nan(mRows,nCols);
-
-for i = 1:nCells
-    
-    ithStreamGradientMap(streamPath(i)) = slopePerDist(i,chosenSlopeForUpArea_Slope);    
-
-end
-
-fileName = strcat(num2str(initY),'_',num2str(initX),'_',num2str(endY),'_',num2str(endX),'_profile_gradient');
-% IPDFDFilePath = fullfile(OUTPUT_DIR,fileName);
-IPDFDFilePath = fullfile('/Volumes/DATA_BAK/WORKSPACE/Project/NewKnickPoints/Raster',fileName);
-
-% ithStreamGradientMap(isnan(ithStreamGradientMap)) = 32767;
-[~,R] = geotiffread(DEMFilePath);
-geotiffwrite(IPDFDFilePath,ithStreamGradientMap,R);
-
-%% Analyze slope-area relationship according to fixed vertical interval
+% Analyze slope-area relationship according to fixed vertical interval
 % note: errors in DEM produce many depressions and negative slope values
 % along a stream profile. Therefore, this algorithm concentrates on
 % making a stream profile without depression. Using this stream profile,
@@ -693,4 +719,22 @@ title('Upstream Area - Slope')
 xlabel('Upstream Area [m^2]')
 ylabel('Slope')
 xlim([min(ipUpstreamArea),max(ipUpstreamArea)])
+
+%% export stream gradient profile to ArcGIS
+
+ithStreamGradientMap = nan(mRows,nCols);
+
+for i = 1:nCells
+    
+    ithStreamGradientMap(streamPath(i)) = slopePerDist(i,chosenSlopeForUpArea_Slope);    
+
+end
+
+fileName = strcat(num2str(initY),'_',num2str(initX),'_',num2str(endY),'_',num2str(endX),'_profile_gradient');
+% IPDFDFilePath = fullfile(OUTPUT_DIR,fileName);
+IPDFDFilePath = fullfile('/Volumes/DATA_BAK/WORKSPACE/Project/NewKnickPoints/Raster',fileName);
+
+% ithStreamGradientMap(isnan(ithStreamGradientMap)) = 32767;
+[~,R] = geotiffread(DEMFilePath);
+geotiffwrite(IPDFDFilePath,ithStreamGradientMap,R);
 
