@@ -1,5 +1,5 @@
-function slopePerDist = CalcSlope(considerNbr,distFromInit ...
-    ,streamProfElev,ithProf)
+function [slopePerDist,slopePerDist_TF] ...
+    = CalcSlope(considerNbr,distFromInit,streamProfElev,ithProf)
 %
 % function CalcSlope
 % 
@@ -17,89 +17,45 @@ function slopePerDist = CalcSlope(considerNbr,distFromInit ...
 %
 %	slopePerDist
 %
-% Version: 0.1.2 / 2015-11-27
+% Version: 0.1.5 / 2016-01-05
 %
+
+if min(considerNbr) <= 1
+    error('CalcSlope function requires a value for the condierNbr variable of more than 1.');
+end
 
 % define variables
 nCNbr = numel(considerNbr);
 nCells = numel(distFromInit);
 slopePerDist = zeros(nCells,nCNbr);
-
-% calculate slope values
-
-% % if you do not want negative slope values, remove depressions in an input
-% % stram profile
-% for i = nCells:-1:2
-%     if streamProfElev(i-1) <= streamProfElev(i)
-%         streamProfElev(i-1) = streamProfElev(i) + 0.000001;
-%     end
-% end
+slopePerDist_TF = false(nCells,nCNbr);
 
 % calculate slope values
 for ithDist = 1:nCNbr
 
+    % boundary nodes
     % first node: forward difference
     firstElev = streamProfElev(1,ithProf);
 	secondElev = streamProfElev(2,ithProf);
+    
 	distBtwCells = distFromInit(2) - distFromInit(1);
-
     slopePerDist(1,ithDist) = (firstElev - secondElev) / distBtwCells;
+    % slopePerDist_TF(1,ithDist) = false;
     
-%     if slopePerDist(1,ithDist) <= 0.000001 * 2 / distBtwCells
-%         slopePerDist(1,ithDist) = nan;
-%     end
+    % upper boundary: central difference with variable ranges
+    for ithCell = 2:considerNbr(ithDist)
 
-    % end node: backward difference
-    firstElev = streamProfElev(nCells-1,ithProf);
-    secondElev = streamProfElev(nCells,ithProf);
-    distBtwCells = distFromInit(nCells) - distFromInit(nCells-1);
+        firstEdge = 1;
+        secondEdge = ithCell + (ithCell - 1);
 
-    slopePerDist(nCells,ithDist) = (firstElev - secondElev) / distBtwCells;
-    
-%     if slopePerDist(nCells,ithDist) <= 0.000001 * 2 / distBtwCells
-%         slopePerDist(nCells,ithDist) = nan;
-%     end
-    
-	% boundary nodes: central difference with variable ranges
-	if considerNbr(ithDist) > 1
-    
-		% upper boundary
-	    for ithCell = 2:considerNbr(ithDist)
+        firstElev = streamProfElev(firstEdge,ithProf);
+        secondElev = streamProfElev(secondEdge,ithProf); 
 
-	        firstEdge = ithCell - (ithCell - 1);
-	        secondEdge = ithCell + (ithCell - 1);
+        distBtwCells = distFromInit(secondEdge) - distFromInit(firstEdge);
+        slopePerDist(ithCell,ithDist) = (firstElev - secondElev) / distBtwCells;
+        % slopePerDist_TF(ithCell,ithDist) = false;
 
-	        firstElev = streamProfElev(firstEdge,ithProf);
-	        secondElev = streamProfElev(secondEdge,ithProf); 
-
-	        distBtwCells = distFromInit(secondEdge) - distFromInit(firstEdge);
-	        slopePerDist(ithCell,ithDist) = (firstElev - secondElev) / distBtwCells;
-            
-%             if slopePerDist(ithCell,ithDist) <= 0.000001 * (secondEdge - firstEdge) / distBtwCells
-%                 slopePerDist(ithCell,ithDist) = nan;
-%             end
-
-	    end
-
-		% lower boundary    
-	    for ithCell = nCells-considerNbr(ithDist)+1:nCells-1
-
-	        firstEdge = ithCell - (nCells - ithCell);
-	        secondEdge = ithCell + (nCells - ithCell);
-
-	        firstElev = streamProfElev(firstEdge,ithProf);
-	        secondElev = streamProfElev(secondEdge,ithProf); 
-
-	        distBtwCells = distFromInit(secondEdge) - distFromInit(firstEdge);
-	        slopePerDist(ithCell,ithDist) = (firstElev - secondElev) / distBtwCells;
-            
-%             if slopePerDist(ithCell,ithDist) <= 0.000001 * (secondEdge - firstEdge) / distBtwCells
-%                 slopePerDist(ithCell,ithDist) = nan;
-%             end
-
-	    end
-    
-	end
+    end
     
 	% mid nodes: central difference	
     for ithCell = considerNbr(ithDist)+1:nCells-considerNbr(ithDist)
@@ -107,16 +63,36 @@ for ithDist = 1:nCNbr
 		firstEdge = ithCell - considerNbr(ithDist);
 		secondEdge = ithCell + considerNbr(ithDist);
 
-        firstElev = streamProfElev(firstEdge,end);
-        secondElev = streamProfElev(secondEdge,end); 
+        firstElev = streamProfElev(firstEdge,ithProf);
+        secondElev = streamProfElev(secondEdge,ithProf); 
 
         distBtwCells = distFromInit(secondEdge) - distFromInit(firstEdge);
         slopePerDist(ithCell,ithDist) = (firstElev - secondElev) / distBtwCells;
+        slopePerDist_TF(ithCell,ithDist) = true;
         
-%         if slopePerDist(ithCell,ithDist) <= 0.000001 * (secondEdge - firstEdge) / distBtwCells
-%             slopePerDist(ithCell,ithDist) = nan;
-%         end
-	        
     end
+    
+    % lower boundary: central difference with variable ranges  
+    for ithCell = nCells-considerNbr(ithDist)+1:nCells-1
+
+        firstEdge = ithCell - (nCells - ithCell);
+        secondEdge = nCells;
+
+        firstElev = streamProfElev(firstEdge,ithProf);
+        secondElev = streamProfElev(secondEdge,ithProf); 
+
+        distBtwCells = distFromInit(secondEdge) - distFromInit(firstEdge);
+        slopePerDist(ithCell,ithDist) = (firstElev - secondElev) / distBtwCells;
+        % slopePerDist_TF(ithCell,ithDist) = false;
+
+    end
+
+    % end node: backward difference
+    firstElev = streamProfElev(nCells-1,ithProf);
+    secondElev = streamProfElev(nCells,ithProf);
+    
+    distBtwCells = distFromInit(nCells) - distFromInit(nCells-1);
+    slopePerDist(nCells,ithDist) = (firstElev - secondElev) / distBtwCells;
+    % slopePerDist_TF(nCells,ithDist) = false;
 
 end

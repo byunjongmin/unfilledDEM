@@ -345,7 +345,7 @@ colorbar;
 title('Digital Elevation Model');
 
 % input the initiation and end point for a profile
-initY = 1753; initX = 3220;
+initY = 3437; initX = 3228;
 endY = 3181; endX = 1951;
 
 % set the number of considered neighbor
@@ -381,6 +381,16 @@ for i = 1:nCells
 
 end
 
+%% export stream gradient profile to ArcGIS
+
+fileName = strcat(num2str(initY),'_',num2str(initX),'_',num2str(endY),'_',num2str(endX),'_profile_gradient');
+% IPDFDFilePath = fullfile(OUTPUT_DIR,fileName);
+IPDFDFilePath = fullfile('/Volumes/DATA_BAK/WORKSPACE/Project/NewKnickPoints/Raster',fileName);
+
+% ithStreamGradientMap(isnan(ithStreamGradientMap)) = 32767;
+[~,R] = geotiffread(DEMFilePath);
+geotiffwrite(IPDFDFilePath,ithStreamGradientMap,R);
+
 %% regression analysis
 
 % within a specific reach
@@ -395,14 +405,3 @@ cX = [3.483*10^7,8.733*10^7,1.764*10^8,5.717*10^8,1.130*10^9];
 cY = [0.04147,0.01987,0.01445,0.005069,0.003747];
 
 polyfit(log(cX),log(cY),1)
-
-%% export stream gradient profile to ArcGIS
-
-fileName = strcat(num2str(initY),'_',num2str(initX),'_',num2str(endY),'_',num2str(endX),'_profile_gradient');
-% IPDFDFilePath = fullfile(OUTPUT_DIR,fileName);
-IPDFDFilePath = fullfile('/Volumes/DATA_BAK/WORKSPACE/Project/NewKnickPoints/Raster',fileName);
-
-% ithStreamGradientMap(isnan(ithStreamGradientMap)) = 32767;
-[~,R] = geotiffread(DEMFilePath);
-geotiffwrite(IPDFDFilePath,ithStreamGradientMap,R);
-

@@ -3,7 +3,20 @@ function [upstreamAreaProf,slopePerDist] ...
     ,chosenProfile,considerNbrForSlope,initX_Knick,endX_Knick ...
     ,chosenSlopeForUpArea_Slope,contInterval,logBinSize...
     ,fSize,orgDEM,nUpstreamCells,mRows,nCols,m2SDSNbrY,m2SDSNbrX,dY,dX)
-
+%
+% function AnalyzeStreamProfile
+% 
+% 	Draw longitudinal profile, calculate relative slope according to given
+%   window sizes, draw area-slope relationship and log-binned relationship
+%
+%	
+% Output Variable
+%
+%	upstreamAreaProf
+%   slopePerDist
+%
+% Version: 0.1.0 / 2016-01-05
+%
 
 %% identify stream path using given initial and end point coordinates
 [streamPath,distFromInit] = RecordStrPath(initY,initX,endY,endX ...
@@ -60,14 +73,15 @@ ylim([min(profElev),max(profElev)])
 inputProfElev = smoothedProfElev;
 nCNbrForSlope = numel(considerNbrForSlope);
 % 너무 크게 구간을 잡으면 연산이 안됨.
-slopePerDist = CalcSlope(considerNbrForSlope,distFromInit,inputProfElev ...
-    ,chosenProfile);
+[slopePerDist,slopePerDist_TF] ...
+    = CalcSlope(considerNbrForSlope,distFromInit,inputProfElev,chosenProfile);
 
 subplot(4,1,3)
 
 cc = jet(nCNbrForSlope);
 for ithLine = 1:nCNbrForSlope
-    plot(distFromInit,slopePerDist(:,ithLine),'color',cc(ithLine,:));
+    RdIdx = slopePerDist_TF(:,ithLine) == true;
+    plot(distFromInit(RdIdx),slopePerDist(RdIdx,ithLine),'color',cc(ithLine,:));
     hold on
 end
 
@@ -80,15 +94,20 @@ xlim([0 distFromInit(end)])
 ylim([min(slopePerDist(:,1)),max(slopePerDist(:,1))])
 
 %% Identify Knickpoints: Relative Slopes (Rd)
-x = considerNbrForSlope(initX_Knick:endX_Knick) .* 2 .* double(dX);
-Rd = nan(nCells,1);
 
+Rd = nan(nCells,1); % relative slope
+rangeX = initX_Knick:endX_Knick;
 for ithCell = 1:nCells
     
-    y = slopePerDist(ithCell,initX_Knick:endX_Knick);    
-    c = polyfit(x,y,1);
+    rXIdx = find(slopePerDist(ithCell,slopePerDist_TF(ithCell,rangeX) == true));
+    if numel(rXIdx) > 1
+        
+        y = slopePerDist(ithCell,rangeX(rXIdx));
+        x = considerNbrForSlope(rangeX(rXIdx)) .* 2 .* double(dX);
+        c = polyfit(x,y,1);
     
-    Rd(ithCell,1) = -c(1);
+        Rd(ithCell,1) = -c(1);
+    end
 
 end
 
@@ -113,10 +132,11 @@ slopePerDistStd = zeros(1,nCNbrForSlope);
 
 for i=1:nCNbrForSlope
     
-    slopePerDistMin(1,i) = min(slopePerDist(:,i));
-    slopePerDistMax(1,i) = max(slopePerDist(:,i));
-    slopePerDistMean(1,i) = mean(slopePerDist(:,i));
-    slopePerDistStd(1,i) = std(slopePerDist(:,i));
+    RdIdx = slopePerDist_TF(:,i) == true;
+    slopePerDistMin(1,i) = min(slopePerDist(RdIdx,i));
+    slopePerDistMax(1,i) = max(slopePerDist(RdIdx,i));
+    slopePerDistMean(1,i) = mean(slopePerDist(RdIdx,i));
+    slopePerDistStd(1,i) = std(slopePerDist(RdIdx,i));
     
 end
 
