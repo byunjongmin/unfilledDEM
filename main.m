@@ -344,20 +344,22 @@ set(gca,'DataAspectRatio',[1 1 1]);
 colorbar;
 title('Digital Elevation Model');
 
+%%
 % input the initiation and end point for a profile
-initY = 3437; initX = 3228;
+initYList = [1468, 3437, 3285, 3385, 3065, 2821, 2834, 1472, 839, 786, 654, 980, 1112, 1070, 1469, 2283];
+initXList = [3186, 3228, 3041, 3027, 3238, 3271, 3287, 2999, 2419, 2294, 2099, 1669, 1429, 1127, 1007, 183];
 endY = 3181; endX = 1951;
 
 % set the number of considered neighbor
-considerNbrForSlope = 3:10:500;
+considerNbrForSlope = 3:5:50;
 chosenProfile = 1; % for smoothing
 
-% chose range for identify knickpoint
-initX_Knick = 16;
-endX_Knick = 31;
+% chose range for realtive slope
+initX_Knick = 4;
+endX_Knick = 10;
 
 % choose a stream gradient profile for corrected upstream area profiles
-chosenSlopeForUpArea_Slope = 25;
+chosenSlopeForUpArea_Slope = 3;
 
 % binned area-slope relationship
 % make elevation values with fixed vertical interval.
@@ -367,29 +369,98 @@ contInterval = 1; % contour interval
 % determine logarithmic binned average slopes
 logBinSize = 0.01;
 
-[upstreamAreaProf,slopePerDist] ...
-    = AnalyzeStreamProfile(initY,initX,endY,endX ...
-    ,chosenProfile,considerNbrForSlope,initX_Knick,endX_Knick ...
-    ,chosenSlopeForUpArea_Slope,contInterval,logBinSize...
-    ,fSize,orgDEM,nUpstreamCells,mRows,nCols,m2SDSNbrY,m2SDSNbrX,dY,dX);
-
-ithStreamGradientMap = nan(mRows,nCols);
-
-for i = 1:nCells
+% analyze stream profile and make map for slope, distance downstream and
+% relative slope.
+streamGradientMap = nan(mRows,nCols);
+distFromInitMap = nan(mRows,nCols);
+RdMap = nan(mRows,nCols);
+nInit = numel(initYList);
+for i=1:nInit
     
-    ithStreamGradientMap(streamPath(i)) = slopePerDist(i,chosenSlopeForUpArea_Slope);    
+    initY = initYList(i);
+    initX = initXList(i);
 
+    [upstreamAreaProf,slopePerDist,Rd,streamPath,distFromInit] ...
+        = AnalyzeStreamProfile(initY,initX,endY,endX ...
+        ,chosenProfile,considerNbrForSlope,initX_Knick,endX_Knick ...
+        ,chosenSlopeForUpArea_Slope,contInterval,logBinSize...
+        ,fSize,orgDEM,nUpstreamCells,mRows,nCols,m2SDSNbrY,m2SDSNbrX,dY,dX);
+
+    nLength = numel(streamPath);
+    
+    % stream gradient map
+    for j=1:nLength
+        if isnan(streamGradientMap(streamPath(j))) ...
+            || slopePerDist(j,chosenSlopeForUpArea_Slope) < streamGradientMap(streamPath(j))
+            streamGradientMap(streamPath(j)) = slopePerDist(j,chosenSlopeForUpArea_Slope);
+        end
+    end
+    
+    % distance from init map
+    for j=1:nLength
+        if isnan(distFromInitMap(streamPath(j))) ...
+            || distFromInitMap(streamPath(j)) < distFromInit(j)
+            distFromInitMap(streamPath(j)) = distFromInit(j);
+        end
+    end
+    
+    
+    % relative slope
+    for j=1:nLength
+        if isnan(RdMap(streamPath(j))) || RdMap(streamPath(j)) < Rd(j)
+            RdMap(streamPath(j)) = Rd(j);
+        end
+    end
+    
 end
+
+figure(21); clf;
+set(gcf, 'Color',[1,1,1]);
+
+imagesc(streamGradientMap);
+set(gca,'DataAspectRatio',[1 1 1]);
+colorbar;
+title('Stream Gradient Map');
+
+figure(22); clf;
+set(gcf, 'Color',[1,1,1]);
+
+imagesc(RdMap);
+set(gca,'DataAspectRatio',[1 1 1]);
+colorbar;
+title('Relative Stream Gradient Map');
+
+figure(23); clf;
+set(gcf, 'Color',[1,1,1]);
+
+imagesc(distFromInitMap);
+set(gca,'DataAspectRatio',[1 1 1]);
+colorbar;
+title('Distance Downstream');
+
 
 %% export stream gradient profile to ArcGIS
 
-fileName = strcat(num2str(initY),'_',num2str(initX),'_',num2str(endY),'_',num2str(endX),'_profile_gradient');
-% IPDFDFilePath = fullfile(OUTPUT_DIR,fileName);
-IPDFDFilePath = fullfile('/Volumes/DATA_BAK/WORKSPACE/Project/NewKnickPoints/Raster',fileName);
+IntRdMap_11 = int32(RdMap .* 10^11);
+diffT = RdMap*10^11- double(IntRdMap_11); % for debug
+max(diffT(:)) % for debug
 
-% ithStreamGradientMap(isnan(ithStreamGradientMap)) = 32767;
-[~,R] = geotiffread(DEMFilePath);
-geotiffwrite(IPDFDFilePath,ithStreamGradientMap,R);
+IntStreamGradientMap_8 = int32(streamGradientMap .* 10^8);
+diffT = streamGradientMap*10^8 - double(IntStreamGradientMap_8); % for debug
+max(diffT(:)) % for debug
+
+IntDistFromInitMap_2 = int32(distFromInitMap * 10^2);
+diffT = distFromInitMap*10^2 - double(IntDistFromInitMap_2); % for debug
+max(diffT(:)) % for debug
+
+[~,R] = geotiffread('/Volumes/DATA_BAK/WORKSPACE/RawData/SRTM/ver_2/SRTM1/n37_e128_1arc_v3.tif');
+geotiffwrite('/Volumes/DATA_BAK/WORKSPACE/Project/NewKnickPoints/Raster/n37_e128_ProfSlp_I8',IntStreamGradientMap_8,R);
+geotiffwrite('/Volumes/DATA_BAK/WORKSPACE/Project/NewKnickPoints/Raster/n37_e128_Rd_I11',IntRdMap_11,R);
+geotiffwrite('/Volumes/DATA_BAK/WORKSPACE/Project/NewKnickPoints/Raster/n37_e128_DownDist_I2',IntDistFromInitMap_2,R);
+
+geotiffwrite('/Volumes/DATA_BAK/WORKSPACE/Project/NewKnickPoints/Raster/n37_e128_ProfSlp_8',streamGradientMap.*10^8,R);
+geotiffwrite('/Volumes/DATA_BAK/WORKSPACE/Project/NewKnickPoints/Raster/n37_e128_Rd_11',RdMap.*10^11,R);
+geotiffwrite('/Volumes/DATA_BAK/WORKSPACE/Project/NewKnickPoints/Raster/n37_e128_DownDist',distFromInitMap.*10,R);
 
 %% regression analysis
 
