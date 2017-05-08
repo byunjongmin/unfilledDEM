@@ -1,4 +1,5 @@
-function [upstreamAreaProf,slopePerDist,Rd,streamPath,distFromInit] ...
+function [upstreamAreaProf,slopePerDist,Rd,streamPath,distFromInit ...
+    ,area_bin,slope_bin] ...
     = AnalyzeStreamProfile(initY,initX,endY,endX ...
     ,chosenProfile,considerNbrForSlope,initX_Knick,endX_Knick ...
     ,chosenSlopeForUpArea_Slope,contInterval,logBinSize...
@@ -31,16 +32,16 @@ nCells = numel(streamPath);
 figure(10); clf;
 set(gcf, 'Color',[1,1,1]);
 
-subplot(4,1,1)
-stairs(distFromInit,profElev);
-
-% grid on
-set(gca,'FontSize',13,'fontWeight','bold')
-title('Longitudinal Stream Profile')
-xlabel('Distance From Divide [m]')
-ylabel('Elevation [m]')
-xlim([0 distFromInit(end)])
-ylim([min(profElev),max(profElev)])
+% subplot(4,1,1)
+% stairs(distFromInit,profElev);
+% 
+% % grid on
+% set(gca,'FontSize',13,'fontWeight','bold')
+% title('Longitudinal Stream Profile')
+% xlabel('Distance From Divide [m]')
+% ylabel('Elevation [m]')
+% xlim([0 distFromInit(end)])
+% ylim([min(profElev),max(profElev)])
 
 %% smoothing stream profiles
 % note that, if you input multiple values, you can compare the differences
@@ -51,7 +52,7 @@ nCNbr = numel(considerNbrForProf); % number of cases
 
 smoothedProfElev = SmoothingElev(considerNbrForProf,distFromInit,orgDEM,streamPath);
 
-subplot(4,1,2)
+subplot(3,1,1)
 
 cc = jet(nCNbr);
 for ithLine = 1:nCNbr
@@ -60,7 +61,8 @@ for ithLine = 1:nCNbr
 end
 
 grid on
-set(gca,'FontSize',13,'fontWeight','bold')
+set(gca,'FontSize',13,'fontWeight','bold' ...
+    ,'XMinorTick','on','YMinorTick','on')
 title('Smoothed Longitudinal Stream Profile')
 xlabel('Distance From Divide [m]')
 ylabel('Elevation [m]')
@@ -76,7 +78,7 @@ nCNbrForSlope = numel(considerNbrForSlope);
 [slopePerDist,slopePerDist_TF] ...
     = CalcSlope(considerNbrForSlope,distFromInit,inputProfElev,chosenProfile);
 
-subplot(4,1,3)
+subplot(3,1,2)
 
 cc = jet(nCNbrForSlope);
 for ithLine = 1:nCNbrForSlope
@@ -86,7 +88,8 @@ for ithLine = 1:nCNbrForSlope
 end
 
 grid on
-set(gca,'FontSize',13,'fontWeight','bold')
+set(gca,'FontSize',13,'fontWeight','bold' ...
+    ,'XMinorTick','on','YMinorTick','on')
 title('Stream Gradient')
 xlabel('Distance From Initiaion [m]')
 ylabel('Slope')
@@ -111,12 +114,13 @@ for ithCell = 1:nCells
 
 end
 
-subplot(4,1,4)
+subplot(3,1,3)
 
 plot(distFromInit,Rd);
 
 grid on
-set(gca,'FontSize',13,'fontWeight','bold')
+set(gca,'FontSize',13,'fontWeight','bold' ...
+    ,'XMinorTick','on','YMinorTick','on')
 title('Relative Slope')
 xlabel('Distance From Divide [m]')
 ylabel('Relative Slope [m^-1]')
@@ -224,7 +228,7 @@ subplot(2,1,1)
 plot(distFromInit,upstreamAreaProf);
 
 set(gca,'YScale','log');
-grid on
+grid off
 title('Upstream Contributing Area - Distance')
 xlabel('Distance From Divide [m]')
 ylabel('Area [m^2]')
@@ -245,6 +249,24 @@ xlabel('Area [m^2]')
 ylabel('Slope')
 xlim([upstreamAreaProf(1),upstreamAreaProf(end)])
 set(gca,'FontSize',18);
+
+
+%% distance - area curve
+
+figure(13); clf;
+set(gcf, 'Color',[1,1,1]);
+
+plot(upstreamAreaProf./10^6,distFromInit)
+
+grid on
+set(gca,'FontSize',13,'fontWeight','bold' ...
+    ,'XMinorTick','on','YMinorTick','on')
+
+title('Upstream Contributing Area - Distance')
+xlabel('Area [km^2]')
+ylabel('Distance')
+xlim([min(upstreamAreaProf(:)./10^6),max(upstreamAreaProf(:)./10^6)])
+ylim([min(distFromInit(:)),max(distFromInit(:))])
 
 %% binned area-slope relationship: analyze slope-area relationship
 % according to fixed vertical interval
@@ -275,7 +297,7 @@ ipDistFromInit = interp1(tStrProfElev,distFromInit,ipElev);
 % draw new stream profile with both elevation with fixed vertical interval
 % and interpolated distance.
 
-figure(13); clf;
+figure(14); clf;
 
 % subplot(5,1,1)
 % % for debug
