@@ -344,86 +344,105 @@ set(gca,'DataAspectRatio',[1 1 1]);
 colorbar;
 title('Digital Elevation Model');
 
-%%
-% % input the initiation and end point for a profile
+%% input the initiation and end point for a profile
+% Note : X, Y coordinate can be obtained from the Figure 7 of upstream cells
+% number.
+
 % initYList = [1468, 3437, 3285, 3385, 3065, 2821, 2834, 1472, 839, 786, 654, 980, 1112, 1070, 1469, 2283];
 % initXList = [3186, 3228, 3041, 3027, 3238, 3271, 3287, 2999, 2419, 2294, 2099, 1669, 1429, 1127, 1007, 183];
 % endY = 3181; endX = 1951;
 
-% % Imgyecheon
+% % Imgyecheon, NHi
 % initYList = 1468; initXList = 3186;
 % endY = 3181; endX = 1951;
 
-% % Naericheon
-% initYList = 3385; initXList = 3027;
-% endY = 3181; endX = 1953;
+% Goljicheon, GJ
+initYList = 2834; initXList = 3287;
+endY = 1886; endX = 2605;
 
-% % Deokgucheon
-% initYList = 3285; initXList = 3041;
-% endY = 3181; endX = 1953;
-
-% % Ocdongcheon
-% initYList = 3437; initXList = 3228;
-% endY = 3181; endX = 1953;
-
-% % Dongnamcheon
-% initYList = 3065; initXList = 3238;
-% endY = 2471; endX = 2256;
-
-% % Dongdaecheon
+% % Dongdaecheon, DD
 % initYList = 2821; initXList = 3271;
 % endY = 2251; endX = 2408;
 
-% % Goljicheon
-% initYList = 2834; initXList = 3287;
-% endY = 1886; endX = 2605;
+% % Dongnamcheon, DN
+% initYList = 3065; initXList = 3238;
+% endY = 2471; endX = 2256;
 
-% % Daegicheon
+% % Ocdongcheon, OCD
+% initYList = 3437; initXList = 3228;
+% endY = 3181; endX = 1953;
+
+% % Deokgucheon, OCDd
+% initYList = 3285; initXList = 3041;
+% endY = 3181; endX = 1953;
+
+% % Deokgeocheon ??
+% initYList = 1112; initXList = 1429;
+% endY = 2796; endX = 1219;
+
+% % Naericheon, OCDn
+% initYList = 3385; initXList = 3027;
+% endY = 3181; endX = 1953;
+
+% % Daegicheon, DG
 % initYList = 1472; initXList = 2999;
 % % endY = 1528; endX = 2680;
 % endY = 1546; endX = 2667; % for remove boundary condition
 
-% % Songcheon
-% initYList = 839; initXList = 2419;
+% % Songcheon, SC
+% initYList = 839; initXList = 2419; % reference
 % endY = 1885; endX = 2604;
 
-% Odaecheon, Durobong
-initYList = 654; initXList = 2099;
-endY = 2028; endX = 2340;
+% Songcheon Addition
+% initYList = 886; initXList = 2390; % 1
+% initYList = 972; initXList = 2516; % 2
+% initYList = 1030; initXList = 2376; % 3
+% initYList = 1007; initXList = 2676; % 4
+% initYList = 917; initXList = 2338; % 5
+% initYList = 1416; initXList = 2288; % 6
+% endY = 1387; endX = 2556;
 
-% % Odaecheon, Noinbong
+% % Songcheon Set
+% initYList = [839,886,972,1030,1007,917,1416];
+% initXList = [2419,2390,2516,2376,2676,2338,2288];
+% endY = 1387; endX = 2556;
+
+% % Odaecheon from Durobong, ODd
+% initYList = 654; initXList = 2099;
+% endY = 2028; endX = 2340;
+
+% % Odaecheon, Noinbong, ODn
 % initYList = 786; initXList = 2294;
 % endY = 2028; endX = 2340;
 
-% % Soksacheon
+% % Soksacheon, PCs
 % initYList = 980; initXList = 1669;
 % endY = 2796; endX = 1219;
 
-% % Deokgeocheon
-% initYList = 1112; initXList = 1429;
-% endY = 2796; endX = 1219;
-
-% % Heungjungcheon
+% % Heungjungcheon, PCh
 % initYList = 1070; initXList = 1127;
 % endY = 2796; endX = 1219;
 
-% % Jucheongang
+% % Jucheongang, JC
 % initYList = 1469; initXList = 1007;
 % endY = 2989; endX = 1694;
 
-% % Ganglimcheon
+% % Ganglimcheon, JCg
 % initYList = 2283; initXList = 183;
 % endY = 2989; endX = 1694;
+
+%% analyze stream profile and make map for slope, distance downstream and
+% relative slope.
 
 % set the number of considered neighbor
 considerNbrForSlope = 3:5:100;
 % for the selection among the many smoothed profiles
-% note: if only 1 smoothed profile, just 1.
+% note: if you want one smoothed profile in the figure, just 1.
 chosenProfile = 1;
 
 % choose range for the calculation of the realtive slope (Rd)
-initX_Knick = 4;
-endX_Knick = 10;
+initX_Knick = 4; % local gradient
+endX_Knick = 10; % trend gradient
 
 % for the selection of a stream gradient profile for the corrected
 % upstream area profiles
@@ -439,12 +458,12 @@ contInterval = 1; % contour interval
 % determine logarithmic binned average slopes
 logBinSize = 0.01;
 
-% analyze stream profile and make map for slope, distance downstream and
-% relative slope.
+% define variables
 streamGradientMap = nan(mRows,nCols);
 distFromInitMap = nan(mRows,nCols);
 RdMap = nan(mRows,nCols);
 nInit = numel(initYList);
+
 for i=1:nInit
     
     initY = initYList(i);
@@ -484,6 +503,160 @@ for i=1:nInit
     
 end
 
+%% Determine the time period during KZ due to orogenic events had passed
+% from the outlet of study area to watershed boundary
+
+% Variables
+% upstreamAreaProf: upstream area [m^2]
+% slopePerDist: stream gradient []
+mC = 2; % determine m, exponent of area
+nC = 3; % determine n, exponent of slope
+uC = 2; % choose uplift rate
+mKm = 2; % choose scenario for representative K
+sC = 4; % choose slope values
+
+if nC == 1
+    n = 1; % plucking
+elseif nC == 2
+    n = 5/3; % abrasion
+elseif nC ==3
+    n = 7/3; % cavitation
+end
+
+if mC == 1
+    m = 0.4*n; % exponent of area
+else
+    m = 0.6*n;
+end
+
+if uC == 1
+    upliftRate = 0.00013; % uplift rate [m/yr]
+elseif uC == 2 % averaged uplift rate
+    upliftRate = 0.0001757; % uplift rate [m/yr]
+else
+    upliftRate = 0.000269; % uplift rate [m/yr]
+end
+    
+slp = slopePerDist(:,sC); % slope using 7th variable in considerNbrForSlope 
+
+% Determine K
+
+K = upliftRate ./ (upstreamAreaProf.^m .* slp.^n); % [m^(1-2m)/yr]
+
+% distribution of K along the profile
+figure(20);
+
+subplot(2,1,1)
+plot(distFromInit,K)
+xlim([min(distFromInit),max(distFromInit)]);
+% ylim([0 1*10^-5])
+xlabel('Distance from channel head');
+ylabel('K');
+title('Distribution of K along the profile')
+grid on
+
+subplot(2,1,2)
+plot(distFromInit,slp)
+xlim([min(distFromInit),max(distFromInit)]);
+xlabel('Distance from channel head');
+ylabel('Stream gradient');
+title('Distribution of stream gradient along the profile')
+
+% statistics of K
+negativeMask = slp < 0;
+infMask = isinf(K);
+artificialArea = false(numel(K),1);
+% artificialArea(690:799) = true;
+
+% condition output
+fprintf('=============================================\n');
+fprintf('Calculation of K conditions: \n');
+fprintf('Uplift rate is                     %12.10f.\n',upliftRate);
+fprintf('m is                               %12.10f.\n',m);
+fprintf('n is                               %12.10f.\n',n);
+fprintf('---------------------------------------------\n');
+
+Kmean = mean(K(~negativeMask & ~infMask & ~artificialArea));
+fprintf('Mean K is                          %12.10f.\n',Kmean);
+Kstd = std(K(~negativeMask & ~infMask & ~artificialArea));
+fprintf('Standard deviation of K is         %12.10f.\n',Kstd);
+
+Kmedian = median(K(~negativeMask & ~infMask & ~artificialArea));
+fprintf('Median K is                        %12.10f.\n',Kmedian);
+Kmad = 1.4826 * mad(K(~negativeMask & ~infMask & ~artificialArea),1); % median absolute deviation
+fprintf('Median absolute deviation of K is  %12.10f.\n',Kmad);
+
+% remove outlier
+if mKm == 1 %
+    outlierMask = K > (Kmean + 2.5*Kstd) | K < -(Kmean + 2.5*Kstd);
+    repK_no = mean(K(~(outlierMask | negativeMask | infMask)));
+else
+    outlierMask = K > (Kmedian + 2.5*Kmad) | K < -(Kmedian + 2.5*Kmad);
+    repK_no = median(K(~(outlierMask | negativeMask | infMask)));
+end
+fprintf('Mean K without outlier is          %12.10f.\n',repK_no);
+
+% Calculate the period for the knickpoint passing through the study area
+
+% variables
+nodeLength = zeros(numel(K),1); % length of nodes along a profile [m]
+nodeLength(2:end) = distFromInit(2:end) - distFromInit(1:end-1);
+
+% Calculate the time for knickzone passing across a node [yr]
+mK = 2; % choose scenario
+if mK == 1
+    % 1st scenario : using representative K value
+    % dt = nodeLength ./ (Kmean .* upstreamAreaProf.^m);
+    % dt = nodeLength ./ (Kmean_no .* upstreamAreaProf.^m);
+    dt = nodeLength ./ (Kmedian .* upstreamAreaProf.^m);
+else
+    % 2nd scenario : based on each K value
+    K(outlierMask | negativeMask | infMask) = repK_no;
+    dt = nodeLength ./ (K .* upstreamAreaProf.^m);
+end
+dtFromOutlet = flipud(dt);
+accDtFromOutlet = cumsum(dtFromOutlet);
+accDt = max(accDtFromOutlet);
+
+fprintf('---------------------------------------------\n');
+fprintf('Calculation of passing time condition : \n');
+if mKm == 1
+    fprintf('Input mean K   in NaNs\n');
+else
+    fprintf('Input median K in NaNs\n');
+end
+fprintf('---------------------------------------------\n');
+
+fprintf('Estimated time for knickpoint passing is %12.1f.\n',accDt);
+
+figure(21)
+distFromOutlet = flipud(max(distFromInit) - distFromInit);
+plot(distFromOutlet,accDtFromOutlet);
+xlim([min(distFromOutlet),max(distFromOutlet)]);
+xlabel('Distance from outlet');
+ylabel('Passing time (Year)');
+title('Distribution of passing time along the profile')
+
+%% export Rd Map
+
+figure(122); clf;
+set(gcf, 'Color',[1,1,1]);
+
+imagesc(RdMap);
+set(gca,'DataAspectRatio',[1 1 1]);
+colorbar;
+title('Relative Stream Gradient Map');
+
+[~,R] = geotiffread('D:\WorkSpace\RawData\SRTM\ver_2\SRTM1\n37_e128_1arc_v3.tif');
+% Note that Rd should be multiplied with 10^11 because of the limitation of
+% ArcGIS Double Floating data type with the maximum precision 12.
+% So after exporting, you should convert the data type of RdMap from doulbe
+% to integer, and then convert RdMap into polyline vector using Raster to
+% Polyline tool, and add a field for Rd in the attribute table of the
+% polyline vector 
+geotiffwrite('D:\WorkSpace\Project\NewKnickPoints\Raster\SC_all.tif',RdMap.*10^11,R);
+
+
 %% statistics of Rd for all profiles
 
 nanSlpMap = isnan(streamGradientMap);
@@ -494,8 +667,6 @@ oRdMap = RdMap;
 nanMRdMap = isnan(oRdMap);
 meanRd = mean(oRdMap(~nanMRdMap));
 stdRd = std(oRdMap(~nanMRdMap));
-
-
 
 mRdMap = RdMap;
 mRdMap(RdMap > 10^-5 | RdMap < -10^-5) = nan;
