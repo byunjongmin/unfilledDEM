@@ -1,28 +1,40 @@
-function main
+function [rndDEMwithBnd,nUpstreamCells,m2SDSNbrY,m2SDSNbrX ...
+    ,mFlowDir_SubFldReg,mFlowDir_Saddle,subFldRegTree,fldRegInfo] ...
+    = main(INPUT_DIR,OUTPUT_DIR,DEMFileName)
 % @file main.m
 % @brief Function to extract stream longitudinal profiles from unfilled
 % DEMs
 %
-% @version 0.5.1 / 2015-11-26
+% @retval rndDEMwithBnd: ramdon values added DEM with boundaries. It is
+%         required to regenerate outputs
+% @retval nUpstreamCells: flow accumulation including flooded regions
+% @retval m2SDSNbrY,m2SDSNbrX: flow direction modified cells along the path
+%         to each regional minima
+% @retval mFlowDir_SubFldReg: flow direction modified cell within a
+%         sub-flooded region 
+% @retval mFlowDir_Saddle: flow direction modified cell on a saddle
+% @retval subFldRegTree
+% @retval fldRegInfo
+%
+% @version 0.5.2 / 2019-08-12
 % @author Jongmin Byun
 %==========================================================================
 
 %% Load DEM
 
-clear all
-
 % Constants
-INPUT_DIR = '../data/input';
-OUTPUT_DIR = '../data/output';
-DEMFileName = 'tareaR50m.tif';
+
 DEMFilePath = fullfile(INPUT_DIR,DEMFileName);
 [DEM,R] = geotiffread(DEMFilePath);
-% note that R means MapCellsReference or GeographicPostingsReference
-% according to CoordinateSysteamType
+% Note that R is MapCellsReference or GeographicPostingsReference
+% depending on the CoordinateSysteamType
 
-% DEM basic properties
+% Basic properties of the imported DEM
 mRows = R.RasterSize(1,1);
 nCols = R.RasterSize(1,2);
+
+% Check whether the DEM is projected to get the cell size: dX and dY
+% 개선: 투영한 것만 사용할 것. geographic 인 경우에 셀 크기가 일정하지 않음
 if strcmp(R.CoordinateSystemType,'planar')
     
     dX = R.CellExtentInWorldX;
@@ -39,90 +51,115 @@ else % strcmp(R,'geographic')
 
 end
 
-DEM = double(DEM);
+% Save the imported raw DEM
+rawDEM = DEM;
 
-% mark a mask of nan
-nanMask = (DEM == 32767 | DEM == -9999); % avoid null values of DEM
+% Add boundaries for DEM to avoid boundary-related errors
+mRows = mRows + 2;
+nCols = nCols + 2;
+DEM = nan(mRows,nCols);
+DEM(2:end-1,2:end-1) = rawDEM;
+
+rawDEMwithBnd = DEM; % raw DEM with boundaries
+
+% Make a mask for nan
+nanMask = isnan(DEM);
+nanMask(DEM == 32767 | DEM == -9999) = true; % avoid null values of DEM
 nanMask(DEM == 0) = true; % include 0 as null value
-orgDEM = DEM; % original DEM
-
-% draw DEM
-figure(1); clf;
-
 DEM(nanMask) = nan;
-imagesc(DEM);
-DEM(nanMask) = orgDEM(nanMask);
 
+DEM = double(DEM); % for integer based DEM
+
+% Draw DEM
+figure(1); clf;
+imagesc(DEM);
 set(gca,'DataAspectRatio',[1 1 1]);
 colorbar;
 title('Digital Elevation Model');
 
 %% Remove flat cells in DEM by adding random elevation values and smoothing
 % using a specific filter
+% To be improved: Smoothing should be avoided because of modification of
+% raw DEM and generation of isolated area near the boundary of DEM
 
-% % for the MATLAB without MappingToolbox
-% dataFileName = 'a_load_DEM_2015-11-26.mat';
-% dataFilePath = fullfile(INPUT_DIR,dataFileName);
-% load(dataFilePath);
+% Check whether flat cells exhibit
 
-% add small random elevation values to DEM
+% Assign flow directions to the DEM using D8 algorithm
+% Note that, before calculation of flow direction of the target drainage,
+% fill NaN areas with higher elevation values
+% For future renference, filling with lower elevation is used for GPSS
+% because all flow should be directed for model outside.
+DEM(~nanMask) = inf;
+[~,slopeAllNbr,~,~,~] = CalcSDSFlow(DEM,dX,dY);
+DEM(nanMask) = nan;
 
-randE = rand(mRows,nCols);
-DEM = DEM + randE * 0.00001;
-
-% smooth DEM
-% bell shaped weight window
-fSize = 2; % radius of window
-transRatio = 1; % ratio of transfering values to next neighbors
-h = ones(fSize*2-1,fSize*2-1);
-for i = 1:fSize
-    h(i:end-(i-1),i:end-(i-1)) = transRatio^(fSize-i);
-end
-h = 1/sum(h(:)) * h;
-% smooth using the filter
-nSmooth = 1;
-for i=1:nSmooth
-    DEM = filter2(h,DEM);
-end
-
-% check whether flat cells are removed
-
-% assign flow directions to the DEM using D8 algorithm
-% note that, for the calculation of flow direction for the target domain,
-% fill nan mask area with lower elevation values
-minElev = min(DEM(~nanMask));
-DEM(nanMask) = minElev - 1;
-[steepestDescentSlope,slopeAllNbr,SDSFlowDirection,SDSNbrY,SDSNbrX] ...
-    = CalcSDSFlow(DEM,dX,dY);
-DEM(nanMask) = minElev + 1;
-
-% make a map of flat cells
+% Make a map of flat cells
 flatRegMap = ProcessFlat(DEM,~nanMask,slopeAllNbr);
 
 nFlatCells = sum(flatRegMap(:));
-if nFlatCells > 0
-    error('Error. There remain flat cells in DEM\n');
+while nFlatCells > 0
+    
+    fprintf('Flat areas are found in the study DEM.\n');
+    fprintf('Random values (<10^6) are added to DEM to exclude the flat area.\n');
+    
+    % Add very little randomly generated values to DEM
+    randElev = rand(mRows,nCols);
+    DEM = DEM + randElev * 0.00001;
+    
+    % Or smooth DEM
+    % 
+    % % make a bell shaped weight window, h
+    % fSize = 2; % radius of window
+    % transRatio = 1; % ratio of transfering values to next neighbors
+    % h = ones(fSize*2-1,fSize*2-1);
+    % for i = 1:fSize
+    %     h(i:end-(i-1),i:end-(i-1)) = transRatio^(fSize-i);
+    % end
+    % h = 1/sum(h(:)) * h;
+    % 
+    % % smooth using the filter h
+    % nSmooth = 1; % number of times
+    % for i=1:nSmooth
+    %     DEM = filter2(h,DEM);
+    % end
+    
+    % display difference between the original and smoothed dEM
+    diffDEM = rawDEMwithBnd - DEM;
+
+    figure(2); clf;
+
+    subplot(1,2,1);
+    imagesc(flatRegMap);
+    set(gca,'DataAspectRatio',[1 1 1]);
+    colorbar;
+    title('Flat cells in DEM');
+
+    subplot(1,2,2);
+    diffDEM(nanMask) = nan;
+    imagesc(diffDEM);
+    set(gca,'DataAspectRatio',[1 1 1]);
+    colorbar;
+    title('Difference between the original and smoothed DEM');   
+    
+    % Assign flow directions to the DEM using D8 algorithm
+    % Note that, before calculation of flow direction of the target drainage,
+    % fill NaN areas with higher elevation values
+    % For future renference, filling with lower elevation is used for GPSS
+    % because all flow should be directed for model outside.
+    maxElev = max(DEM(~nanMask));
+    DEM(nanMask) = maxElev + 1;
+    [~,slopeAllNbr,~,~,~] = CalcSDSFlow(DEM,dX,dY);
+    DEM(nanMask) = nan;
+
+    % Make a map of flat cells
+    flatRegMap = ProcessFlat(DEM,~nanMask,slopeAllNbr);
+    nFlatCells = sum(flatRegMap(:));
+    
+    rndDEMwithBnd = DEM; % ramdon values added DEM with boundaries
 end
 
-% display difference between the original and smoothed dEM
-diffDEM = orgDEM - DEM;
+%% Make a test domain for debugging
 
-figure(2); clf;
-
-subplot(1,2,1);
-imagesc(flatRegMap(fSize*2:end-fSize*2,fSize*2:end-fSize*2));
-set(gca,'DataAspectRatio',[1 1 1]);
-colorbar;
-title('Flat cells in DEM');
-
-subplot(1,2,2);
-diffDEM(nanMask) = nan;
-imagesc(diffDEM(fSize*2:end-fSize*2,fSize*2:end-fSize*2));
-set(gca,'DataAspectRatio',[1 1 1]);
-colorbar;
-title('Difference between the original and smoothed DEM');
-
-%% for a test domain
 IS_IT_PART = false;
 if IS_IT_PART == true
 
@@ -131,7 +168,7 @@ if IS_IT_PART == true
     tXMin = 117; tXMax = 168;
     
     % cut DEM
-    orgDEM = DEM(tYMin:tYMax,tXMin:tXMax); % original DEM
+    rawDEMwithBnd = DEM(tYMin:tYMax,tXMin:tXMax); % original DEM
     DEM = DEM(tYMin:tYMax,tXMin:tXMax); % smoothed DEM
     
     [mRows,nCols] = size(DEM);
@@ -146,7 +183,7 @@ if IS_IT_PART == true
 
     DEM(nanMask) = nan;
     imagesc(DEM);
-    DEM(nanMask) = orgDEM(nanMask);
+    DEM(nanMask) = rawDEMwithBnd(nanMask);
     
     set(gca,'DataAspectRatio',[1 1 1]);
     colorbar;
@@ -154,55 +191,42 @@ if IS_IT_PART == true
     
 end
 
-%% Define target drainage and treat boundaries of DEM
-% note that you can choose whether the boundaries are higher or lower
+%% Pick the outlet of the study drainage and replace the outlet with nan
+% Note that, to use ProcessSink function, a mask should be made for the
+% outer region of the target drainage including its outlet
 
-% first, include the area out of nanMask
-targetDrainage = (~nanMask); % target drainage
+targetDrainage = ~nanMask; % study areas
 
-IS_BND_LOWER = false;
+% Pick the outlet of the target drainage
+DEM(nanMask) = inf;
+% Extract the boundary of the target drainage
+s = strel('square',3); % structural element when eroding image
+dilatedTarget = imerode(targetDrainage,s); 
+targetBnd = targetDrainage & ~dilatedTarget;
+targetBndIdx = find(targetBnd);
 
-if IS_BND_LOWER == true
-    
-    DEM(~targetDrainage) = min(DEM(targetDrainage)) - 0.1;
-    
-else % IS_BND_LOWER == false
+% Identify the coordinate of the outlet
+targetBndElev = DEM(targetBndIdx);
+[~,minElevIdx] = min(targetBndElev);
+outletIdx = targetBndIdx(minElevIdx); % outlet on the boundary of drainage
+[outletY,outletX] = ind2sub([mRows,nCols],outletIdx);
 
-    % pick the outlet of the target drainage
+% Note that the elevation of the main outlet should be the lowest.
+DEM(outletY,outletX) = min(DEM(:)) - 0.1;
 
-    DEM(~targetDrainage) = inf;
-    % extract the boundary of the target drainage
-    s = strel('square',3); % structural element when eroding image
-    dilatedTarget = imerode(targetDrainage,s); 
-    targetBnd = targetDrainage & ~dilatedTarget;
-    targetBndIdx = find(targetBnd);
-
-    % identify the coordinate of the outlet
-    targetBndElev = DEM(targetBndIdx);
-    [~,minElevIdx] = min(targetBndElev);
-    outletIdx = targetBndIdx(minElevIdx); % outlet on the boundary of drainage
-    [outletY,outletX] = ind2sub([mRows,nCols],outletIdx);
-
-    % Note that the elevation of the main outlet should be the lowest.
-    DEM(outletY,outletX) = min(DEM(:)) - 0.1;
-
-    % locate outlet of target drainage
-    targetDrainage(outletY,outletX) = false;
-    
-end
+% Locate the outlet of target drainage
+targetDrainage(outletY,outletX) = false;
 
 %% Assign flow direction to the target area in DEM using D8 algorithm
 
-[steepestDescentSlope,slopeAllNbr,SDSFlowDirection,SDSNbrY,SDSNbrX] ...
+[~,slopeAllNbr,SDSFlowDirection,SDSNbrY,SDSNbrX] ...
     = CalcSDSFlow(DEM,dX,dY);
 
 %% Process sinks
 % Identify depressions and their outlets, then modify each depression
-% outlet's flow direction to go downstream when flows are overspilled
+% outlet's flow direction to go downstream if flows are overspilled
 % over the depression
 
-% Note : To use ProcessSink function, make a mask excepting the main outlet
-% and outer region of the target drainage
 [flood ... % flooded region map
 ,m1SDSNbrY,m1SDSNbrX ... % modified for flooed region and its outlet
 ,m2SDSNbrY,m2SDSNbrX ... % modified only for flooded region's outlets 
@@ -216,15 +240,26 @@ end
     = ProcessSink(DEM,targetDrainage,slopeAllNbr ...
         ,SDSNbrY,SDSNbrX,SDSFlowDirection);
 
-% frequency distribution of the types of sub-flooded region's outlet
-figure(4); clf;
+% Frequency distribution of the types of sub-flooded region's outlet
+figure(3); clf;
 set(gcf, 'Color',[1,1,1]);
-h = histogram(subFldRegOutlet(subFldRegOutlet > 0));
+histogram(subFldRegOutlet(subFldRegOutlet > 0));
 xlabel('Type of Sub-flooded Region Outlet');
 ylabel('Frequency');
 grid on
 
-% set boundary
+% For reference
+% 1: outlet to a dry neighbor
+% 2: outlet to a wet neighbor
+% 3: outlet linked to another flooded region with the same elevation outlet
+%    so not true oulet
+% 4: shared outlet to a dry neighbor
+% 5: shared outlet to a wet neighbor
+% 6: shared outlet linked to another flooded region with the same elevation outlet
+% 7: shared outlet surrounded by the cells with higher elevation. so not
+%    true outlet.
+
+% Set a temporary boundary of DEM for debugging
 fXMin = 1; fXMax = nCols;
 fYMin = 1; fYMax = mRows;
 
@@ -268,13 +303,6 @@ disp(subFldRegTree.tostring);
 
 %% Calculate upstream cells number of all cells within every depression
 
-% % for debug
-% clear all
-% INPUT_DIR = '../data/input';
-% dataFileName = 'a_CalcUpstreamCells_2015-11-20_2.mat';
-% dataFilePath = fullfile(INPUT_DIR,dataFileName);
-% load(dataFilePath);
-
 % A. Calculate the number of upstream cells out of flooded region
 nUpstreamCellsWithFldReg = CalcUpstreamCellsWithFldReg(DEM,targetDrainage ...
     ,flood,m1SDSNbrY,m1SDSNbrX,fldRegID,nFldRegCells);
@@ -289,23 +317,23 @@ nUpstreamCells ...
 figure(7);
 set(gcf,'Color',[1 1 1])
 
-% subplot(1,3,1)
-% imagesc(nUpstreamCellsWithFldReg);
-% title('Upstream Cells No. with Depressions');
-% axis image
-% % set(gca,'YTick',[],'XTick' ,[])
-% colormap(flipud(colormap(gray)))
-% colorbar
-% 
-% subplot(1,3,2)
-% imagesc(nUpstreamCells);
-% title('Upstream Cells No.');
-% axis image
-% % set(gca,'YTick',[],'XTick' ,[])
-% colormap(flipud(colormap(gray)))
-% colorbar
+subplot(1,3,1)
+imagesc(nUpstreamCellsWithFldReg);
+title('Upstream Cells No. with Depressions');
+axis image
+% set(gca,'YTick',[],'XTick' ,[])
+colormap(flipud(colormap(gray)))
+colorbar
 
-% subplot(1,3,3)
+subplot(1,3,2)
+imagesc(nUpstreamCells);
+title('Upstream Cells No.');
+axis image
+% set(gca,'YTick',[],'XTick' ,[])
+colormap(flipud(colormap(gray)))
+colorbar
+
+subplot(1,3,3)
 imagesc(log(nUpstreamCells));
 title('Upstream Cells No. [Log]');
 axis image
@@ -326,123 +354,45 @@ colorbar
 
 %% Draw a stream longitudinal profile on the interesting stream path
 
-% for debug
-clear all
-INPUT_DIR = '../data/input';
-dataFileName = 'SRTM_1_dCon_0.5_20151126.mat';
-dataFilePath = fullfile(INPUT_DIR,dataFileName);
-load(dataFilePath);
+% % for debug
+% clear all
+% INPUT_DIR = '../data/input';
+% dataFileName = 'SRTM_1_dCon_0.5_20151126.mat';
+% dataFilePath = fullfile(INPUT_DIR,dataFileName);
+% load(dataFilePath);
 
-% slopePerDistTotal = []; % for total sloperPerDist statistics
+slopePerDistTotal = []; % for total sloperPerDist statistics
 
-% draw DEM
-figure(9); clf;
-set(gcf, 'Color',[1,1,1]);
-
-imagesc(DEM);
-set(gca,'DataAspectRatio',[1 1 1]);
-colorbar;
-title('Digital Elevation Model');
+% % draw DEM
+% figure(9); clf;
+% set(gcf, 'Color',[1,1,1]);
+% 
+% imagesc(DEM);
+% set(gca,'DataAspectRatio',[1 1 1]);
+% colorbar;
+% title('Digital Elevation Model');
 
 %% input the initiation and end point for a profile
 % Note : X, Y coordinate can be obtained from the Figure 7 of upstream cells
 % number.
 
-% initYList = [1468, 3437, 3285, 3385, 3065, 2821, 2834, 1472, 839, 786, 654, 980, 1112, 1070, 1469, 2283];
-% initXList = [3186, 3228, 3041, 3027, 3238, 3271, 3287, 2999, 2419, 2294, 2099, 1669, 1429, 1127, 1007, 183];
-% endY = 3181; endX = 1951;
-
-% % Imgyecheon, NHi
-% initYList = 1468; initXList = 3186;
-% endY = 3181; endX = 1951;
-
-% Goljicheon, GJ
-initYList = 2834; initXList = 3287;
-endY = 1886; endX = 2605;
-
-% % Dongdaecheon, DD
-% initYList = 2821; initXList = 3271;
-% endY = 2251; endX = 2408;
-
-% % Dongnamcheon, DN
-% initYList = 3065; initXList = 3238;
-% endY = 2471; endX = 2256;
-
-% % Ocdongcheon, OCD
-% initYList = 3437; initXList = 3228;
-% endY = 3181; endX = 1953;
-
-% % Deokgucheon, OCDd
-% initYList = 3285; initXList = 3041;
-% endY = 3181; endX = 1953;
-
-% % Deokgeocheon ??
-% initYList = 1112; initXList = 1429;
-% endY = 2796; endX = 1219;
-
-% % Naericheon, OCDn
-% initYList = 3385; initXList = 3027;
-% endY = 3181; endX = 1953;
-
-% % Daegicheon, DG
-% initYList = 1472; initXList = 2999;
-% % endY = 1528; endX = 2680;
-% endY = 1546; endX = 2667; % for remove boundary condition
-
-% % Songcheon, SC
-% initYList = 839; initXList = 2419; % reference
-% endY = 1885; endX = 2604;
-
-% Songcheon Addition
-% initYList = 886; initXList = 2390; % 1
-% initYList = 972; initXList = 2516; % 2
-% initYList = 1030; initXList = 2376; % 3
-% initYList = 1007; initXList = 2676; % 4
-% initYList = 917; initXList = 2338; % 5
-% initYList = 1416; initXList = 2288; % 6
-% endY = 1387; endX = 2556;
-
-% % Songcheon Set
-% initYList = [839,886,972,1030,1007,917,1416];
-% initXList = [2419,2390,2516,2376,2676,2338,2288];
-% endY = 1387; endX = 2556;
-
-% % Odaecheon from Durobong, ODd
-% initYList = 654; initXList = 2099;
-% endY = 2028; endX = 2340;
-
-% % Odaecheon, Noinbong, ODn
-% initYList = 786; initXList = 2294;
-% endY = 2028; endX = 2340;
-
-% % Soksacheon, PCs
-% initYList = 980; initXList = 1669;
-% endY = 2796; endX = 1219;
-
-% % Heungjungcheon, PCh
-% initYList = 1070; initXList = 1127;
-% endY = 2796; endX = 1219;
-
-% % Jucheongang, JC
-% initYList = 1469; initXList = 1007;
-% endY = 2989; endX = 1694;
-
-% % Ganglimcheon, JCg
-% initYList = 2283; initXList = 183;
-% endY = 2989; endX = 1694;
+% Temp
+initYList = 1009; initXList = 114;
+endY = outletY; endX = outletX;
 
 %% analyze stream profile and make map for slope, distance downstream and
 % relative slope.
 
 % set the number of considered neighbor
+considerNbrForSmooth = 3:3:9;
 considerNbrForSlope = 3:5:100;
 % for the selection among the many smoothed profiles
 % note: if you want one smoothed profile in the figure, just 1.
 chosenProfile = 1;
 
 % choose range for the calculation of the realtive slope (Rd)
-initX_Knick = 4; % local gradient
-endX_Knick = 10; % trend gradient
+initX_forRd = 4; % local gradient
+endX_forRd = 10; % trend gradient
 
 % for the selection of a stream gradient profile for the corrected
 % upstream area profiles
@@ -471,9 +421,10 @@ for i=1:nInit
 
     [upstreamAreaProf,slopePerDist,Rd,streamPath,distFromInit,area_bin,slope_bin] ...
         = AnalyzeStreamProfile(initY,initX,endY,endX ...
-        ,chosenProfile,considerNbrForSlope,initX_Knick,endX_Knick ...
-        ,chosenSlopeForUpArea_Slope,contInterval,logBinSize...
-        ,fSize,orgDEM,nUpstreamCells,mRows,nCols,m2SDSNbrY,m2SDSNbrX,dY,dX);
+        ,chosenProfile,considerNbrForSmooth,considerNbrForSlope ...
+        ,initX_forRd,endX_forRd,chosenSlopeForUpArea_Slope,contInterval ...
+        ,logBinSize,rawDEMwithBnd,nUpstreamCells,mRows,nCols ...
+        ,m2SDSNbrY,m2SDSNbrX,dY,dX);
 
     nLength = numel(streamPath);
     
@@ -502,6 +453,110 @@ for i=1:nInit
     end
     
 end
+
+%% export Rd Map
+
+figure(122); clf;
+set(gcf, 'Color',[1,1,1]);
+
+imagesc(RdMap);
+set(gca,'DataAspectRatio',[1 1 1]);
+colorbar;
+title('Relative Stream Gradient Map');
+
+% Note that Rd should be multiplied with 10^11 because of the limitation of
+% ArcGIS Double Floating data type with the maximum precision 12.
+% So after exporting, you should convert the data type of RdMap from doulbe
+% to integer, and then convert RdMap into polyline vector using Raster to
+% Polyline tool, and add a field for Rd in the attribute table of the
+% polyline vector
+RdMap_org = RdMap(2:end-1,2:end-1).*10^11;
+RdMap_org(isnan(RdMap_org)) = -9999;
+RdMapFileName = 'study-area-Rd.tif';
+RdMapFilePath = fullfile(OUTPUT_DIR,RdMapFileName);
+geotiffwrite('study-area-Rd.tif',RdMap_org,R,'CoordRefSysCode','EPSG:32652');
+
+%% statistics of Rd for all profiles
+
+nanSlpMap = isnan(streamGradientMap);
+meanSlp = mean(streamGradientMap(~nanSlpMap));
+stdSlp = std(streamGradientMap(~nanSlpMap));
+
+oRdMap = RdMap;
+nanMRdMap = isnan(oRdMap);
+meanRd = mean(oRdMap(~nanMRdMap));
+stdRd = std(oRdMap(~nanMRdMap));
+
+% mRdMap = RdMap;
+% % mRdMap(RdMap > 10^-5 | RdMap < -10^-5) = nan;
+% nanMRdMap = isnan(mRdMap);
+% meanRd = mean(mRdMap(~nanMRdMap));
+% stdRd = std(mRdMap(~nanMRdMap));
+
+fprintf('=============================================\n');
+fprintf('Statistics of Rd for all profiles: \n');
+fprintf('mean - 2 * sigma                 %12.10f.\n',meanRd - 2*stdRd);
+fprintf('mean - 1 * sigma                 %12.10f.\n',meanRd - 1*stdRd);
+fprintf('mean                             %12.10f.\n',meanRd);
+fprintf('mean + 1 * sigma                  %12.10f.\n',meanRd + 1*stdRd);
+fprintf('mean + 2 * sigma                  %12.10f.\n',meanRd + 2*stdRd);
+fprintf('---------------------------------------------\n');
+
+%% make distibution maps
+
+figure(21); clf;
+set(gcf, 'Color',[1,1,1]);
+imagesc(streamGradientMap);
+set(gca,'DataAspectRatio',[1 1 1]);
+colorbar;
+title('Stream Gradient Map');
+
+figure(22); clf;
+set(gcf, 'Color',[1,1,1]);
+imagesc(RdMap);
+set(gca,'DataAspectRatio',[1 1 1]);
+colorbar;
+title('Relative Stream Gradient Map');
+
+figure(23); clf;
+set(gcf, 'Color',[1,1,1]);
+imagesc(distFromInitMap);
+set(gca,'DataAspectRatio',[1 1 1]);
+colorbar;
+title('Distance Downstream');
+
+
+%% export stream gradient profile to ArcGIS
+
+[~,R] = geotiffread('/Volumes/DATA_BAK/WORKSPACE/RawData/SRTM/ver_2/SRTM1/n37_e128_1arc_v3.tif');
+mNUpstreamCells = nUpstreamCells;
+mNUpstreamCells(isnan(distFromInitMap)) = nan;
+geotiffwrite('/Volumes/DATA_BAK/WORKSPACE/Project/NewKnickPoints/Raster/n37_e128_Area',mNUpstreamCells.*dX.*dY./10^6,R);
+geotiffwrite('/Volumes/DATA_BAK/WORKSPACE/Project/NewKnickPoints/Raster/n37_e128_ProfSlp_8',streamGradientMap.*10^8,R);
+geotiffwrite('/Volumes/DATA_BAK/WORKSPACE/Project/NewKnickPoints/Raster/n37_e128_Rd_11',RdMap.*10^11,R);
+geotiffwrite('/Volumes/DATA_BAK/WORKSPACE/Project/NewKnickPoints/Raster/n37_e128_DownDist',distFromInitMap,R);
+
+%% regression analysis
+
+% within a specific reach
+minArea = 1*10^6;
+maxArea = 100*10^6;
+
+% % for not binned
+% rangeIdx = find(upstreamAreaProf > minArea & upstreamAreaProf < maxArea);
+% polyfit(log(upstreamAreaProf(rangeIdx)),log(slopePerDist(rangeIdx,chosenSlopeForUpArea_Slope)),1)
+
+% for binned
+rangeIdx = find(area_bin > minArea & area_bin < maxArea);
+% polyfit(log(area_bin(rangeIdx)),log(slope_bin(rangeIdx)),1)
+ft = fittype('poly1');
+[result,gof] = fit(log(area_bin(rangeIdx))',log(slope_bin(rangeIdx))',ft)
+
+% % for chosen locations
+% cX = [3.483*10^7,8.733*10^7,1.764*10^8,5.717*10^8,1.130*10^9];
+% cY = [0.04147,0.01987,0.01445,0.005069,0.003747];
+% 
+% polyfit(log(cX),log(cY),1)
 
 %% Determine the time period during KZ due to orogenic events had passed
 % from the outlet of study area to watershed boundary
@@ -636,107 +691,4 @@ xlim([min(distFromOutlet),max(distFromOutlet)]);
 xlabel('Distance from outlet');
 ylabel('Passing time (Year)');
 title('Distribution of passing time along the profile')
-
-%% export Rd Map
-
-figure(122); clf;
-set(gcf, 'Color',[1,1,1]);
-
-imagesc(RdMap);
-set(gca,'DataAspectRatio',[1 1 1]);
-colorbar;
-title('Relative Stream Gradient Map');
-
-[~,R] = geotiffread('D:\WorkSpace\RawData\SRTM\ver_2\SRTM1\n37_e128_1arc_v3.tif');
-% Note that Rd should be multiplied with 10^11 because of the limitation of
-% ArcGIS Double Floating data type with the maximum precision 12.
-% So after exporting, you should convert the data type of RdMap from doulbe
-% to integer, and then convert RdMap into polyline vector using Raster to
-% Polyline tool, and add a field for Rd in the attribute table of the
-% polyline vector 
-geotiffwrite('D:\WorkSpace\Project\NewKnickPoints\Raster\SC_all.tif',RdMap.*10^11,R);
-
-
-%% statistics of Rd for all profiles
-
-nanSlpMap = isnan(streamGradientMap);
-meanSlp = mean(streamGradientMap(~nanSlpMap));
-stdSlp = std(streamGradientMap(~nanSlpMap));
-
-oRdMap = RdMap;
-nanMRdMap = isnan(oRdMap);
-meanRd = mean(oRdMap(~nanMRdMap));
-stdRd = std(oRdMap(~nanMRdMap));
-
-mRdMap = RdMap;
-mRdMap(RdMap > 10^-5 | RdMap < -10^-5) = nan;
-nanMRdMap = isnan(mRdMap);
-meanRd = mean(mRdMap(~nanMRdMap));
-stdRd = std(mRdMap(~nanMRdMap));
-
-meanRd + 0.5*stdRd
-meanRd - 0.5*stdRd
-meanRd + 1.5*stdRd
-meanRd - 1.5*stdRd
-meanRd + 2.5*stdRd
-meanRd - 2.5*stdRd
-
-%% regression analysis
-
-% within a specific reach
-minArea = 1*10^6;
-maxArea = 100*10^6;
-
-% % for not binned
-% rangeIdx = find(upstreamAreaProf > minArea & upstreamAreaProf < maxArea);
-% polyfit(log(upstreamAreaProf(rangeIdx)),log(slopePerDist(rangeIdx,chosenSlopeForUpArea_Slope)),1)
-
-% for binned
-rangeIdx = find(area_bin > minArea & area_bin < maxArea);
-% polyfit(log(area_bin(rangeIdx)),log(slope_bin(rangeIdx)),1)
-ft = fittype('poly1');
-[result,gof] = fit(log(area_bin(rangeIdx))',log(slope_bin(rangeIdx))',ft)
-
-% % for chosen locations
-% cX = [3.483*10^7,8.733*10^7,1.764*10^8,5.717*10^8,1.130*10^9];
-% cY = [0.04147,0.01987,0.01445,0.005069,0.003747];
-% 
-% polyfit(log(cX),log(cY),1)
-
-%% make distibution maps
-
-figure(21); clf;
-set(gcf, 'Color',[1,1,1]);
-
-imagesc(streamGradientMap);
-set(gca,'DataAspectRatio',[1 1 1]);
-colorbar;
-title('Stream Gradient Map');
-
-figure(22); clf;
-set(gcf, 'Color',[1,1,1]);
-
-imagesc(RdMap);
-set(gca,'DataAspectRatio',[1 1 1]);
-colorbar;
-title('Relative Stream Gradient Map');
-
-figure(23); clf;
-set(gcf, 'Color',[1,1,1]);
-
-imagesc(distFromInitMap);
-set(gca,'DataAspectRatio',[1 1 1]);
-colorbar;
-title('Distance Downstream');
-
-
-%% export stream gradient profile to ArcGIS
-
-[~,R] = geotiffread('/Volumes/DATA_BAK/WORKSPACE/RawData/SRTM/ver_2/SRTM1/n37_e128_1arc_v3.tif');
-mNUpstreamCells = nUpstreamCells;
-mNUpstreamCells(isnan(distFromInitMap)) = nan;
-geotiffwrite('/Volumes/DATA_BAK/WORKSPACE/Project/NewKnickPoints/Raster/n37_e128_Area',mNUpstreamCells.*dX.*dY./10^6,R);
-geotiffwrite('/Volumes/DATA_BAK/WORKSPACE/Project/NewKnickPoints/Raster/n37_e128_ProfSlp_8',streamGradientMap.*10^8,R);
-geotiffwrite('/Volumes/DATA_BAK/WORKSPACE/Project/NewKnickPoints/Raster/n37_e128_Rd_11',RdMap.*10^11,R);
-geotiffwrite('/Volumes/DATA_BAK/WORKSPACE/Project/NewKnickPoints/Raster/n37_e128_DownDist',distFromInitMap,R);
 
