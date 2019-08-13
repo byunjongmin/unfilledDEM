@@ -3,13 +3,13 @@ function [m2SDSNbrY,m2SDSNbrX,mFlowDir_SubFldReg,mFlowDir_Saddle ...
     = AssignFlowDirInFldReg(m2SDSNbrY,m2SDSNbrX,subFldRegOutInfo,DEM ...
     ,slopeAllNbr,regionalMin,fldRegID,subFldRegID,sharedOutlet)
 % @file AssignFlowDirInFldReg.m
-% @brief Assign flow direction to the cells along the deepest route in
-% flooded region to link an anther regional minima in next sub flooded
-% region
+% @brief Assign flow direction to the cells along the maximum-depth route
+% in flooded region to link to another regional minima or the next
+% sub-flooded region
 %
-% @param(in] m2SDSNbrY: modified flow direction cells along the path to
-%                       each regional minima
-% @param[in) m2SDSNbrX
+% @param[in] m2SDSNbrY: modified flow direction along the maximum-depth
+%                       path to each regional minima
+% @param[in] m2SDSNbrX
 % @param[in] SDSFlowDirection
 % @param[in] subFldRegOutInfo
 % @param[in] DEM
@@ -19,7 +19,7 @@ function [m2SDSNbrY,m2SDSNbrX,mFlowDir_SubFldReg,mFlowDir_Saddle ...
 % @param[in] subFldRegID
 % @param[in] fldRegID
 % @param[in] subFldRegID
-% @param[in) flatRegionMap
+% @param[in] flatRegionMap
 % @retval m2SDSNbrY
 % @retval m2SDSNbrX
 % @retval flatRegMap
@@ -27,26 +27,28 @@ function [m2SDSNbrY,m2SDSNbrX,mFlowDir_SubFldReg,mFlowDir_Saddle ...
 % @retval root: tree database of sub-flooded regions
 % @retval fldRegInfo
 %
-% @version 0.3.0 / 2015-11-20
+% @version 0.3.1 / 2019-08-13
 % @author Jongmin Byun
 %==========================================================================
 
-% constants
+% Constants
 [mRows,nCols] = size(DEM);
 ROOT_ID = 1;
 
-% variables
-root = tree('Root Node'); % init the tree db of sub-flooded regions
-mFlowDir_SubFldReg = nan(mRows,nCols); % flow direction modified cell within a sub-flooded region
-mFlowDir_Saddle = zeros(mRows,nCols); % flow direction modified cell on a saddle
+% Variables
+root = tree('Root Node'); % init a tree DB for sub-flooded regions
+mFlowDir_SubFldReg ...  % flow direction modified cells within sub-flooded
+    = nan(mRows,nCols); % regions
+mFlowDir_Saddle = zeros(mRows,nCols); % flow direction modified cells on saddles
 
-% make flooded region info array: ID, outlet index,
+% Make flooded region info array: ID, outlet index,
 % number of sub-flooded regions, outlet's elevation
+
+% Calculate the number of flooded region
 uniqueFldRegID = unique(fldRegID); % unique flooded region ID
 uniqueFldRegID(uniqueFldRegID <= 0) = [];
 nFldReg = numel(uniqueFldRegID); % number of flooded region
-fldRegInfo ... % info about the flooded region
-    = zeros(nFldReg,4);
+fldRegInfo = zeros(nFldReg,4); % info about the flooded region    
 
 for i=1:nFldReg
     
@@ -54,54 +56,61 @@ for i=1:nFldReg
 
     if ~isnan(ithFldRegOutIdx)
         
+        fldRegInfo(i,1) = uniqueFldRegID(i); % ith flooded region ID
+        fldRegInfo(i,2) = ithFldRegOutIdx; % its outlet index
+        % number of the cells on the ith sub-flooded region
         subFldRegInIthFldReg ...
             = unique(subFldRegID(fldRegID == uniqueFldRegID(i)));
         nSubFldRegInIthFldReg = numel(subFldRegInIthFldReg);
-        fldRegInfo(i,1) = uniqueFldRegID(i);
-        fldRegInfo(i,2) = ithFldRegOutIdx;
         fldRegInfo(i,3) = nSubFldRegInIthFldReg;
         fldRegInfo(i,4) = DEM(ithFldRegOutIdx);
         
-    else
+    else % isnan(ithFldRegOutIdx)
         
-        error('Error, \nFlooded region info.');
+        fprintf('Error in making the flooded region information.\n');
+        fprintf('Flooded region ID does not match with the ID of its outlet.\n');
+        error('Stop the AssignFlowDirInFldReg function');        
 
     end
-end
+    
+end % for i=1:nFldReg
 
 fldRegInfo = sortrows(fldRegInfo,4);
 
-% main body
+% Main body
 for i = 1:nFldReg
     
-    fprintf( '%d/%d in AssignFlowInFldReg function\n ' ...
+    fprintf( '%d/%d is processing in the AssignFlowInFldReg function\n ' ...
         ,i,nFldReg) % for debug
     
-    % collect the info about the ith flooded region
+    % Collect the info about the ith flooded region
     ithFldRegID = fldRegInfo(i,1); % ith flooded region ID
     ithFldRegOutIdx = fldRegInfo(i,2); % its outlet index
     [ithFldRegOutY,ithFldRegOutX] = ind2sub([mRows,nCols],ithFldRegOutIdx);
     nSubFldRegInIthFldReg = fldRegInfo(i,3);
     
-    % init the tree DB of sub-flooded regions in the ith flooded region
+    % Init the tree DB of sub-flooded regions in the ith flooded region
     [root,ithFldRegTreeID] = root.addnode(ROOT_ID,ithFldRegID);
 
-    % firstly, find a path from the true outlet to the minimum of the first
-    % visit sub-flooded region
+    % Firstly, find a path from the true outlet to the minimum elevation of
+    % the first visit sub-flooded region
     
-    % set variables for the first operation of the FindPathToMin function
+    % Set variables for the first operation of the FindPathToMin function
     upStreamY = ithFldRegOutY;
     upStreamX = ithFldRegOutX;
     prevSubFldRegID = nan; % previously gone sub-flooded region ID
     targetSubFldRegID = nan; % target sub-flooded region ID
 
-    goneSubFldRegID = []; % record for already gone sub-flooded region ID
+    goneSubFldRegID = []; % record for the already gone sub-flooded region ID
     outConnectedSubFldRegID = []; % true outlet connected sub-flooded region ID
+    % or ID of the sub-flooded region adjacent to the true outlet
     nOutConnectedSubFldReg = sharedOutlet(upStreamY,upStreamX) + 1;
     
     for j = 1:nOutConnectedSubFldReg
         
-        if j~= 1 % it means upStreamY,X is a shared true outlet
+        if j~= 1 % It means upStreamY,X is a shared true outlet.
+            
+            % Therefore, set the parameter the same again
             upStreamY = ithFldRegOutY;
             upStreamX = ithFldRegOutX;
             prevSubFldRegID = nan;

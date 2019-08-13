@@ -12,24 +12,24 @@ function [m2SDSNbrY,m2SDSNbrX,arrivedRegMinY,arrivedRegMinX ...
 % @param[in] upStreamIdx
 % @param[in] slopeAllNbr
 % @param[in] flatRegMap
-% @param(in] flatRegBndInfo
+% @param[in] flatRegBndInfo
 % @param[in] SDSFlowDirection
 % @param[in] SDSNbrY
 % @param[in] SDSNbrX
 % @param[in] regionalMinima
 % @param[in] flatRegionPathInfo
 % @param[in] DEM
-% @param(in] fldRegWithNoRegMin
+% @param[in] fldRegWithNoRegMin
 % @param[in] fldRegID
 % @param[in] subFldRegID
-% @param(in] arrivedRegMinIdx
-% @param(in] ithFldRegID
+% @param[in] arrivedRegMinIdx
+% @param[in] ithFldRegID
 % @param[in] targetSubFldRegID
 % @param[in] prevSubFldRegID
 % @param[in] mFlowDir_SubFldReg
 % @param[in] mFlowDir_Saddle
 % @param[in] ithFldRegOutIdx
-% @param(in] flatRegInfo
+% @param[in] flatRegInfo
 % @retval SDSNbrY
 % @retval SDSNbrX
 % @retval flatRegionPathInfo flow direction information in the flat regions
@@ -37,7 +37,7 @@ function [m2SDSNbrY,m2SDSNbrX,arrivedRegMinY,arrivedRegMinX ...
 % @retval mFlowDir_SubFldReg
 % @retval mFlowDir_Saddle
 %
-% @version 0.2.0. / 2015-11-12
+% @version 0.2.1. / 2019-08-13
 % @author Jongmin Byun
 %==========================================================================
 
@@ -49,7 +49,8 @@ FROM_TARWSD_TO_TARWSD = 3; % from target to target sub flooded region
 ithOffset ... % offset for ith neighbour
     = [mRows,mRows-1,-1,-mRows-1,-mRows,-mRows+1,1,mRows+1];
 
-% identify the type of an initial upstream cell
+% 1. identify the type of an initial upstream cell: shared true outlet,
+% true outlet, and saddle
 IS_SHARED_TRUE_OUTLET = false;
 IS_TRUE_OUTLET = false;
 IS_SADDLE = false;
@@ -62,7 +63,7 @@ if upStreamIdx == ithFldRegOutIdx
         IS_TRUE_OUTLET = true;    
     end
     
-else
+else % upStreamIdx ~= ithFldRegOutIdx
     
     if sharedOutlet(upStreamIdx) > 0
         IS_SADDLE = true;
@@ -70,22 +71,23 @@ else
     
 end
 
-% find the Steepest Downstream Cell (SDC) at the initUpstreamIdx according
+% 2. find the Steepest Downstream Cell (SDC) at the initUpstreamIdx according
 % to the type of the initial upstream cell
 steeperSlope = 0; % for the target sub-flooded region
 iSteeperSlope = 0; % for the previous gone sub-flooded region
 firstMet_tf = true; % for a shared true outlet, the variable to indicate
-                    % that it has already visited a sub-flooded region
+                    % whether it has already visited a sub-flooded region
 for i = 1:8
 
     ithNbrIdx = upStreamIdx + ithOffset(i);
     [ithNbrY,ithNbrX] = ind2sub([mRows,nCols],ithNbrIdx);
 
-    % for the cell within the domain boundary            
+    % for the cell within the domain boundary
+    % 개선: 이게 실제 의미가 있나? 유역 외부가 nan이라면 할 필요가 없지
     if (1 <= ithNbrY && ithNbrY <= Y+2) ...
            && (1 <= ithNbrX && ithNbrX <= X+2)
        
-        % for the ith flooded region
+        % for the cell in ith flooded region
         if fldRegID(ithNbrIdx) == ithFldRegID
 
             % if the init upstream cell is true outlet
@@ -100,7 +102,8 @@ for i = 1:8
                 end
                 
             elseif IS_SHARED_TRUE_OUTLET == true
-                                   
+                         
+                % check whether the target subFldRegId is defined
                 if isnan(targetSubFldRegID)
                     
                     % if targetSubFldRegID is not defined,
@@ -188,7 +191,7 @@ for i = 1:8
 end % for i = 1:8
 
 % if upstream cell is a (shared) saddle, change flow
-% direction of the cell to go in the gone watershed
+% direction of the cell to go to the gone watershed
 if IS_SADDLE == true
 
     if mFlowDir_Saddle(upStreamIdx) == NOT_MODIFIED ...

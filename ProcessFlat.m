@@ -22,6 +22,6 @@ OUTER_BOUNDARY(Y_INI:Y_MAX,X_INI:X_MAX) = false;
 flatRegMap = zeros(mRows,nCols);
 
 for i=1:8
-    iFlatRegMap = slopeAllNbr(:,:,i)==0 & ~OUTER_BOUNDARY & targetDrainage;
+    iFlatRegMap = slopeAllNbr(:,:,i) == 0 & ~OUTER_BOUNDARY & targetDrainage;
     flatRegMap = iFlatRegMap | flatRegMap;        
 end

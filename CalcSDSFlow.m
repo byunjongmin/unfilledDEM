@@ -28,7 +28,7 @@ Y_INI = 2; Y_MAX = Y+1;
 X_LEFT_BND = 1; X_RIGHT_BND = nCols;
 X_INI = 2; X_MAX = X+1;
 
-QUARTER_PI = 0.785398163397448;     % pi * 0.25
+QUARTER_PI = pi * 0.25;
 DIAGONAL_DIST = sqrt(dX^2 + dY^2);
 DISTANCE_TO_NBR = [dX,DIAGONAL_DIST,dY,DIAGONAL_DIST ...
                     ,dX,DIAGONAL_DIST,dY,DIAGONAL_DIST];
@@ -44,7 +44,7 @@ e0LinearIndicies = (arrayX-1) * mRows + arrayY;
 % elevation of local cell(e0)
 sE0LinearIndicies = (sArrayX-1) * mRows + sArrayY;
 
-% (최대하부경사 유향을 구하는 과정에서) 8 방향 이웃 셀을 가리키는 3차원 색인 배열
+% 3d array to indicate the index of the next downstream neighbor
 s3IthNbrLinearIndicies = zeros(Y,X,8);
 
 ithNbrYOffset = [0 -1 -1 -1  0  1  1  1];
@@ -57,9 +57,9 @@ for i = 1:8
 end
 
 SDSFlowDirection = nan(mRows,nCols);
-sSDSFlowDirection = nan(Y, X);
+sSDSFlowDirection = nan(Y, X); % without bounday
 steepestDescentSlope = nan(mRows,nCols);
-sSteepestDescentSlope = -inf(Y, X);
+sSteepestDescentSlope = -inf(Y, X); % without boundary
 slopeAllNbr = nan(mRows,nCols,8);
 
 [SDSNbrX,SDSNbrY] = meshgrid(X_LEFT_BND:X_RIGHT_BND,Y_TOP_BND:Y_BOTTOM_BND);
@@ -67,30 +67,27 @@ slopeAllNbr = nan(mRows,nCols,8);
 
 sE0Elevation = DEM(sE0LinearIndicies);
 
+% main body to calculate the slope value for each neighbor
 initialNbrX = sSDSNbrX;
 initialNbrY = sSDSNbrY;
 
-for i = 1:8
+for k = 1:8
 
-    sKthNbrElevation = DEM(s3IthNbrLinearIndicies(:,:,i));
-
-    sKthNbrSlope = (sE0Elevation - sKthNbrElevation) / DISTANCE_TO_NBR(i);
-
-    slopeAllNbr(Y_INI:Y_MAX,X_INI:X_MAX,i) = sKthNbrSlope;
+    sKthNbrElevation = DEM(s3IthNbrLinearIndicies(:,:,k));
+    sKthNbrSlope = (sE0Elevation - sKthNbrElevation) / DISTANCE_TO_NBR(k);
+    slopeAllNbr(Y_INI:Y_MAX,X_INI:X_MAX,k) = sKthNbrSlope;
 
     biggerSlope = sKthNbrSlope > sSteepestDescentSlope;
-
-    sSDSNbrY(biggerSlope) = initialNbrY(biggerSlope) + ithNbrYOffset(i);
-    sSDSNbrX(biggerSlope) = initialNbrX(biggerSlope) + ithNbrXOffset(i);
+    sSDSNbrY(biggerSlope) = initialNbrY(biggerSlope) + ithNbrYOffset(k);
+    sSDSNbrX(biggerSlope) = initialNbrX(biggerSlope) + ithNbrXOffset(k);
     
     possitiveSlope = sKthNbrSlope > 0;
-
-    sSDSFlowDirection(biggerSlope & possitiveSlope) = (i-1) * QUARTER_PI;
-
+    sSDSFlowDirection(biggerSlope & possitiveSlope) = (k-1) * QUARTER_PI;
     sSteepestDescentSlope(biggerSlope) = sKthNbrSlope(biggerSlope);
 
 end % for i = 1:8
 
+% output
 SDSFlowDirection(Y_INI:Y_MAX,X_INI:X_MAX) = sSDSFlowDirection;
 steepestDescentSlope(Y_INI:Y_MAX,X_INI:X_MAX) = sSteepestDescentSlope;
 SDSNbrX(Y_INI:Y_MAX,X_INI:X_MAX) = sSDSNbrX;

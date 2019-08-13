@@ -1,9 +1,9 @@
 function [upstreamAreaProf,slopePerDist,Rd,streamPath,distFromInit ...
     ,area_bin,slope_bin] ...
     = AnalyzeStreamProfile(initY,initX,endY,endX ...
-    ,chosenProfile,considerNbrForSlope,initX_Knick,endX_Knick ...
-    ,chosenSlopeForUpArea_Slope,contInterval,logBinSize...
-    ,fSize,orgDEM,nUpstreamCells,mRows,nCols,m2SDSNbrY,m2SDSNbrX,dY,dX)
+    ,chosenProfile,considerNbrForSlope,initX_forRd,endX_forRd ...
+    ,chosenSlopeForArea_Slope,contInterval,logBinSize...
+    ,orgDEM,nUpstreamCells,mRows,nCols,m2SDSNbrY,m2SDSNbrX,dY,dX)
 %
 % function AnalyzeStreamProfile
 % 
@@ -16,26 +16,24 @@ function [upstreamAreaProf,slopePerDist,Rd,streamPath,distFromInit ...
 %	upstreamAreaProf
 %   slopePerDist
 %
-% Version: 0.1.0 / 2016-01-05
+% Version: 0.1.1 / 2019-08-13
 %
 
-%% identify stream path based on the given initial and end point coordinates
+%% Identify stream path based on the given initial and end point coordinates
 [streamPath,distFromInit] = RecordStrPath(initY,initX,endY,endX ...
     ,mRows,nCols,m2SDSNbrY,m2SDSNbrX,dY,dX);
 
-% stream longitudinal profile using raw DEM
-% note that we use the original DEM
+% Stream longitudinal profile using raw DEM
 profElev = orgDEM(streamPath(:));
 nCells = numel(streamPath);
 
-% draw figure
-figure(10); clf;
+% Draw figure
+figure(21); clf;
+
+subplot(3,1,1);
 set(gcf, 'Color',[1,1,1]);
-
-subplot(4,1,1)
 stairs(distFromInit,profElev);
-
-% grid on
+grid on
 set(gca,'FontSize',13,'fontWeight','bold')
 title('Longitudinal Stream Profile')
 xlabel('Distance From Divide [m]')
@@ -43,15 +41,15 @@ ylabel('Elevation [m]')
 xlim([0 distFromInit(end)])
 ylim([min(profElev),max(profElev)])
 
-%% generate stream profiles smoothed using different moving windows
-% note that, if you input multiple values for the number of considering
+%% Generate stream profiles smoothed using different moving windows
+% Note that, if you input multiple values for the number of considering
 % neighbor cells, you can notice their differences 
 
 nCNbr = numel(considerNbrForSmooth); % number of cases
+smoothedProfElev ...
+    = SmoothingElev(considerNbrForSmooth,distFromInit,orgDEM,streamPath);
 
-smoothedProfElev = SmoothingElev(considerNbrForSmooth,distFromInit,orgDEM,streamPath);
-
-subplot(5,1,1)
+subplot(3,1,2)
 
 cc = jet(nCNbr);
 for ithLine = 1:nCNbr
@@ -70,14 +68,14 @@ ylim([min(profElev),max(profElev)])
 
 %% Draw stream gradient
 
-% chose base elevation of profile
+% Chose base elevation of profile
 inputProfElev = smoothedProfElev;
 nCNbrForSlope = numel(considerNbrForSlope);
 % 너무 크게 구간을 잡으면 연산이 안됨.
 [slopePerDist,slopePerDist_TF] ...
     = CalcSlope(considerNbrForSlope,distFromInit,inputProfElev,chosenProfile);
 
-subplot(5,1,2)
+subplot(3,1,3)
 
 cc = jet(nCNbrForSlope);
 for ithLine = 1:nCNbrForSlope
@@ -124,7 +122,9 @@ for ithCell = 1:nCells
 
 end
 
-subplot(5,1,3)
+figure(22);
+
+subplot(3,1,1)
 plot(distFromInit,Rd);
 grid on
 set(gca,'FontSize',13,'fontWeight','bold' ...
@@ -135,7 +135,7 @@ ylabel('Relative Slope [m^-1]')
 xlim([0 distFromInit(end)])
 ylim([-1E-5,1E-5])
 
-subplot(5,1,4)
+subplot(3,1,2)
 plot(distFromInit,nValuesForRd);
 grid on
 set(gca,'FontSize',13,'fontWeight','bold' ...
@@ -145,7 +145,7 @@ xlabel('Distance From Divide [m]')
 ylabel('Number of values')
 xlim([0 distFromInit(end)])
 
-subplot(5,1,5)
+subplot(3,1,3)
 plot(distFromInit,Rsquare);
 grid on
 set(gca,'FontSize',13,'fontWeight','bold' ...
@@ -155,7 +155,7 @@ xlabel('Distance From Divide [m]')
 ylabel('R^2')
 xlim([0 distFromInit(end)])
 
-%% simple statistics of slopePerDist for determining the number of cells
+%% Simple statistics of slopePerDist for determining the number of cells
 % for calculation of the local and trend slope
 
 slopePerDistMin = zeros(1,nCNbrForSlope);
@@ -173,10 +173,7 @@ for i=1:nCNbrForSlope
     
 end
 
-% slopePerDistTotal = [slopePerDistTotal...
-%     ;slopePerDistMin; slopePerDistMax; slopePerDistMean; slopePerDistStd];
-
-figure(11); clf;
+figure(23); clf;
 
 subplot(2,2,1)
 scatter(considerNbrForSlope .* dX,slopePerDistMin);
@@ -211,47 +208,16 @@ xlabel('Distance (Dd)')
 ylabel('Standard Deviation')
 
 
-%% draw corrected upstream area profiles on the stream paths of interest
+%% Draw corrected upstream area profiles on the stream paths of interest
 
 % calculate upstream area
 upstreamAreaProf = nUpstreamCells(streamPath(:)) .* dX .* dY;
 
-% % correction of upstream area prof
-% prevUpArea = upstreamAreaProf(1);
-% initUpArea = inf;
-% isInitFirst = true;
-%
-% for ithCell = 2:nCells
-%     
-%     if upstreamAreaProf(ithCell) < prevUpArea
-% 
-%         if isInitFirst == true
-%         
-%             initUpArea = prevUpArea;
-%             isInitFirst = false;
-%             
-%         end
-%         
-%         upstreamAreaProf(ithCell) = initUpArea;        
-%         
-%     end
-%     
-%     if upstreamAreaProf(ithCell) > initUpArea
-%         
-%         isInitFirst = true;
-%         
-%     end       
-%     
-%     prevUpArea = upstreamAreaProf(ithCell);
-% 
-% end
-
-figure(12); clf;
+figure(24); clf;
 set(gcf, 'Color',[1,1,1]);
 
 subplot(2,1,1)
 plot(distFromInit,upstreamAreaProf);
-
 set(gca,'YScale','log');
 grid off
 title('Upstream Contributing Area - Distance')
@@ -262,11 +228,9 @@ ylim([min(upstreamAreaProf),max(upstreamAreaProf)])
 set(gca,'FontSize',18);
 
 % draw upslope area - slope relationship
-
 subplot(2,1,2)
-scatter(upstreamAreaProf,slopePerDist(:,chosenSlopeForUpArea_Slope) ...
+scatter(upstreamAreaProf,slopePerDist(:,chosenSlopeForArea_Slope) ...
     ,'Marker','*');
-
 set(gca,'XScale','log','YScale','log');
 grid off
 title('Upstream Contributing Area - Slope')
@@ -276,9 +240,9 @@ xlim([upstreamAreaProf(1),upstreamAreaProf(end)])
 set(gca,'FontSize',18);
 
 
-%% distance - area curve
+% Distance - area curve
 
-figure(13); clf;
+figure(25); clf;
 set(gcf, 'Color',[1,1,1]);
 
 plot(upstreamAreaProf./10^6,distFromInit)
@@ -293,9 +257,9 @@ ylabel('Distance')
 xlim([min(upstreamAreaProf(:)./10^6),max(upstreamAreaProf(:)./10^6)])
 ylim([min(distFromInit(:)),max(distFromInit(:))])
 
-%% binned area-slope relationship: analyze slope-area relationship
+%% Binned area-slope relationship: analyze slope-area relationship
 % based on the vertically fixed interval method
-% note: errors in DEM produce many depressions and negative slope values
+% Note that errors in DEM produce many depressions and negative slope values
 % along a stream profile. Therefore, this algorithm concentrates on
 % making a stream profile without depression. Using this stream profile,
 % it calculates new slope values and log binnined average slope values.
@@ -303,30 +267,30 @@ ylim([min(distFromInit(:)),max(distFromInit(:))])
 % better. Because the smoothed stream profile has less depressions than
 % raw stream profile data.
 
-% make a vertically fixed interval
+% Make a vertically fixed interval
 ipElevMin = 10 * floor(0.1 * profElev(end));
 ipElevMax = 10 * ceil(0.1 * profElev(1));
 ipElev = ipElevMax:-contInterval:ipElevMin;
 
-% make a distance set interpolated from the correlation of elevation and
-% distance. note that, for avoiding errors from depression, depression are
+% Make a distance set interpolated from the correlation of elevation and
+% distance. Note that, for avoiding errors from depression, depression are
 % to be removed
 
 tStrProfElev = profElev;
-% remove depressions in an input stream profile.
+% Remove depressions in an input stream profile.
 nCells = numel(distFromInit);
 for a = nCells:-1:2
     if tStrProfElev(a-1) <= tStrProfElev(a)
         tStrProfElev(a-1) = tStrProfElev(a) + 0.000001;
     end
 end
-% interpolated distance from channel head
+% Interpolated distance from channel head
 ipDistFromInit = interp1(tStrProfElev,distFromInit,ipElev);
 
-% draw stream profiles against vertically fixed interval and interpolated
+% Draw stream profiles against vertically fixed interval and interpolated
 % distance
 
-figure(14); clf;
+figure(26); clf;
 
 subplot(5,1,1)
 % for debug
