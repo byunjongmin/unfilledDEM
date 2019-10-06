@@ -1,9 +1,10 @@
-function [upstreamAreaProf,slopePerDist,Rd,streamPath,distFromInit ...
-    ,area_bin,slope_bin] ...
-    = AnalyzeStreamProfile(initY,initX,endY,endX,chosenProfile ...
-    ,nNbrForSmooth,nNbrForCalcSlope,initXforRd,endXforRd ...
+function [streamPath,smoothedProfElev,slopePerDist,distFromInit,Rd ...
+        ,upstreamAreaProf,ipDistFromInit,ipElev,newSlope,ipUpstreamArea ...
+        ,area_bin,slope_bin] = AnalyzeStreamProfile(initY,initX,endY,endX ...
+    ,chosenProfile,nNbrForSmooth,nNbrForCalcSlope,initXforRd,endXforRd ...
     ,chosenSlopeForAreaSlope,contInterval,logBinSize...
-    ,rawDEMwithBnd,nUpstreamCells,mRows,nCols,m2SDSNbrY,m2SDSNbrX,dY,dX)
+    ,rawDEMwithBnd,nUpstreamCells,mRows,nCols,m2SDSNbrY,m2SDSNbrX,dY,dX ...
+    ,DRAINAGE_ID,ithCatchment,OUTPUT_DIR)
 %
 % function AnalyzeStreamProfile
 % 
@@ -28,15 +29,15 @@ profElev = rawDEMwithBnd(streamPath(:));
 nCells = numel(streamPath);
 
 % Draw figure
-figure(21); clf;
+f21 = figure(21); clf;
 
 subplot(3,1,1);
 set(gcf, 'Color',[1,1,1]);
 stairs(distFromInit,profElev);
 grid on
-set(gca,'FontSize',13,'fontWeight','bold')
-title('Longitudinal Stream Profile')
-xlabel('Distance From Divide [m]')
+title(strcat('Longitudinal Stream Profile, ' ...
+    ,num2str(DRAINAGE_ID),'th Drainage, ',num2str(ithCatchment),'th Catchment'));
+xlabel('Distance in Downstream Direction [m]')
 ylabel('Elevation [m]')
 xlim([0 distFromInit(end)])
 ylim([min(profElev),max(profElev)])
@@ -58,10 +59,9 @@ for ithLine = 1:nCNbr
 end
 
 grid on
-set(gca,'FontSize',13,'fontWeight','bold' ...
-    ,'XMinorTick','on','YMinorTick','on')
+set(gca,'XMinorTick','on','YMinorTick','on')
 title('Smoothed Longitudinal Stream Profile')
-xlabel('Distance From Divide [m]')
+xlabel('Distance in Downstream Direction [m]')
 ylabel('Elevation [m]')
 xlim([0 distFromInit(end)])
 ylim([min(profElev),max(profElev)])
@@ -86,13 +86,16 @@ for ithLine = 1:nCNbrForSlope
 end
 
 grid on
-set(gca,'FontSize',13,'fontWeight','bold' ...
-    ,'XMinorTick','on','YMinorTick','on')
+set(gca,'XMinorTick','on','YMinorTick','on')
 title('Stream Gradient')
-xlabel('Distance From Initiaion [m]')
+xlabel('Distance in Downstream Direction [m]')
 ylabel('Slope')
 xlim([0 distFromInit(end)])
 ylim([min(slopePerDist(:,1)),max(slopePerDist(:,1))])
+
+profFigFileName = strcat(num2str(DRAINAGE_ID),'_',num2str(ithCatchment),'_profFig');
+profFigFilePath = fullfile(OUTPUT_DIR,profFigFileName);
+saveas(f21,profFigFilePath,'jpg');
 
 %% Identify Knickpoints: Relative Slopes (Rd)
 
@@ -122,15 +125,16 @@ for ithCell = 1:nCells
 
 end
 
-figure(22);
+figure(22); clf;
+set(gcf,'Color',[1,1,1]);
 
 subplot(3,1,1)
 plot(distFromInit,Rd);
 grid on
-set(gca,'FontSize',13,'fontWeight','bold' ...
-    ,'XMinorTick','on','YMinorTick','on')
-title('Relative Slope')
-xlabel('Distance From Divide [m]')
+set(gca,'XMinorTick','on','YMinorTick','on')
+title(strcat('Relative Slope, ' ...
+    ,num2str(DRAINAGE_ID),'th Drainage, ',num2str(ithCatchment),'th Catchment'));
+xlabel('Distance in Downstream Direction [m]')
 ylabel('Relative Slope [m^-1]')
 xlim([0 distFromInit(end)])
 ylim([-1E-5,1E-5])
@@ -138,20 +142,18 @@ ylim([-1E-5,1E-5])
 subplot(3,1,2)
 plot(distFromInit,nValuesForRd);
 grid on
-set(gca,'FontSize',13,'fontWeight','bold' ...
-    ,'XMinorTick','on','YMinorTick','on')
+set(gca,'XMinorTick','on','YMinorTick','on')
 title('Number of values for curve fitting')
-xlabel('Distance From Divide [m]')
+xlabel('Distance in Downstream Direction [m]')
 ylabel('Number of values')
 xlim([0 distFromInit(end)])
 
 subplot(3,1,3)
 plot(distFromInit,Rsquare);
 grid on
-set(gca,'FontSize',13,'fontWeight','bold' ...
-    ,'XMinorTick','on','YMinorTick','on')
+set(gca,'XMinorTick','on','YMinorTick','on')
 title('R^2')
-xlabel('Distance From Divide [m]')
+xlabel('Distance in Downstream Direction [m]')
 ylabel('R^2')
 xlim([0 distFromInit(end)])
 
@@ -174,36 +176,34 @@ for i=1:nCNbrForSlope
 end
 
 figure(23); clf;
+set(gcf,'Color',[1,1,1])
 
 subplot(2,2,1)
 scatter(nNbrForCalcSlope .* dX,slopePerDistMin);
 grid on
-set(gca,'FontSize',13,'fontWeight','bold')
-title('Change in Minimum Stream Gradient')
+title(strcat('Min Stream Gradient, ' ...
+    ,num2str(DRAINAGE_ID),' Drainage, ',num2str(ithCatchment),'th Catchment'));
 xlabel('Distance (Dd)')
-ylabel('Stream Gradient')
+ylabel('Minimum Stream Gradient')
 
 subplot(2,2,2)
 scatter(nNbrForCalcSlope .* dX,slopePerDistMax);
 grid on
-set(gca,'FontSize',13,'fontWeight','bold')
-title('Change in Maximum Stream Gradient')
+title('Max Stream Gradient')
 xlabel('Distance (Dd)')
-ylabel('Stream Gradient')
+ylabel('Maximum Stream Gradient')
 
 subplot(2,2,3)
 scatter(nNbrForCalcSlope .* dX,slopePerDistMean);
 grid on
-set(gca,'FontSize',13,'fontWeight','bold')
-title('Change in Mean Stream Gradient')
+title('Mean Stream Gradient')
 xlabel('Distance (Dd)')
-ylabel('Stream Gradient')
+ylabel('Mean Stream Gradient')
 
 subplot(2,2,4)
 scatter(nNbrForCalcSlope .* dX,slopePerDistStd);
 grid on
-set(gca,'FontSize',13,'fontWeight','bold')
-title('Change in Standard Deviation Stream Gradient')
+title('Standard Deviation of Stream Gradient')
 xlabel('Distance (Dd)')
 ylabel('Standard Deviation')
 
@@ -216,42 +216,37 @@ upstreamAreaProf = nUpstreamCells(streamPath(:)) .* dX .* dY;
 figure(24); clf;
 set(gcf, 'Color',[1,1,1]);
 
-subplot(2,1,1)
+subplot(3,1,1)
 plot(distFromInit,upstreamAreaProf);
 set(gca,'YScale','log');
 grid off
-title('Upstream Contributing Area - Distance')
-xlabel('Distance From Divide [m]')
+title(strcat('Area-Distance, ' ...
+    ,num2str(DRAINAGE_ID),' Drainage, ',num2str(ithCatchment),'th Catchment'));
+xlabel('Distance in Downstream Direction [m]')
 ylabel('Area [m^2]')
 xlim([0 distFromInit(end)])
 ylim([min(upstreamAreaProf),max(upstreamAreaProf)])
-set(gca,'FontSize',18);
 
 % draw upslope area - slope relationship
-subplot(2,1,2)
+subplot(3,1,2)
 scatter(upstreamAreaProf,slopePerDist(:,chosenSlopeForAreaSlope) ...
     ,'Marker','*');
 set(gca,'XScale','log','YScale','log');
 grid off
-title('Upstream Contributing Area - Slope')
+% title('Area-Slope')
 xlabel('Area [m^2]')
 ylabel('Slope')
 xlim([upstreamAreaProf(1),upstreamAreaProf(end)])
-set(gca,'FontSize',18);
 
 
 % Distance - area curve
-
-figure(25); clf;
-set(gcf, 'Color',[1,1,1]);
-
+subplot(3,1,3)
 plot(upstreamAreaProf./10^6,distFromInit)
 
 grid on
-set(gca,'FontSize',13,'fontWeight','bold' ...
-    ,'XMinorTick','on','YMinorTick','on')
+set(gca,'XMinorTick','on','YMinorTick','on')
 
-title('Upstream Contributing Area - Distance')
+% title('Area-Distance')
 xlabel('Area [km^2]')
 ylabel('Distance')
 xlim([min(upstreamAreaProf(:)./10^6),max(upstreamAreaProf(:)./10^6)])
@@ -290,15 +285,17 @@ ipDistFromInit = interp1(tStrProfElev,distFromInit,ipElev);
 % Draw stream profiles against vertically fixed interval and interpolated
 % distance
 
-figure(26); clf;
+f25 = figure(25); clf;
+set(gcf,'Color',[1,1,1]);
 
 subplot(5,1,1)
 % for debug
 % plot(distFromInit,tStrProfElev,'o',ipDistFromInit,ipElev);
 plot(ipDistFromInit,ipElev);
 grid on
-title('Longitudinal Stream Profile')
-xlabel('Interpolated Distance From Channel Head [m]')
+title(strcat('Longitudinal Stream Profile, ' ...
+    ,num2str(DRAINAGE_ID),' Drainage, ',num2str(ithCatchment),'th Catchment'));
+% xlabel('Interpolated Downstream Distance [m]')
 ylabel('Elevation [m]')
 xlim([0 max(ipDistFromInit)])
 ylim([min(ipElev),max(ipElev)])
@@ -325,8 +322,8 @@ subplot(5,1,2)
 plot(ipDistFromInit,newSlope,'*')
 
 % grid on
-xlabel('Interpolated Distance From Channel Head [m]')
-ylabel('Slope from Interpolated Elevation and Distance')
+% xlabel('Interpolated Downstream Distance [m]')
+ylabel('Recalculated Slope')
 xlim([0 max(ipDistFromInit)])
 ylim([min(newSlope),max(newSlope)])
 
@@ -337,9 +334,8 @@ subplot(5,1,3)
 plot(ipDistFromInit,ipUpstreamArea);
 set(gca,'YScale','log');
 grid on
-title('Interpolated Upstream Area Profile')
-xlabel('Interpolated Distance From Channel Head [m]')
-ylabel('Interpolated Upstream Area [m^2]')
+xlabel('Interpolated Downstream Distance [m]')
+ylabel('Interpolated Area [m^2]')
 xlim([0 max(ipDistFromInit)])
 ylim([min(ipUpstreamArea),max(ipUpstreamArea)])
 
@@ -348,9 +344,8 @@ subplot(5,1,4)
 scatter(ipUpstreamArea,newSlope,'m+')
 set(gca,'XScale','log','YScale','log');
 grid on
-title('Interpolated Upstream Area and Slope')
-xlabel('Interpolated Upstream Area [m^2]')
-ylabel('Slope from Interpolated Elevation and Distance')
+xlabel('Interpolated Area [m^2]')
+ylabel('Recalculated Slope')
 xlim([min(ipUpstreamArea),max(ipUpstreamArea)])
 
 % determine logarithmic-binned average slopes
@@ -384,8 +379,12 @@ slope_bin = tempSlope(find(tempSlope));
 
 subplot(5,1,5)
 loglog(area_bin,slope_bin,'rs','MarkerFaceColor','r','MarkerSize',3)
-% grid on
-title('Logarithmically binned Upstream Area and Slope')
-xlabel('Upstream Area [m^2]')
-ylabel('Slope')
+grid on
+% title('Logarithmically binned Upstream Area and Slope')
+xlabel('Logarithmically-Binned Area [m^2]')
+ylabel('Binned Slope')
 xlim([min(ipUpstreamArea),max(ipUpstreamArea)])
+
+iPProfFigFileName = strcat(num2str(DRAINAGE_ID),'_',num2str(ithCatchment),'_iPProfFig');
+iPProfFigFilePath = fullfile(OUTPUT_DIR,iPProfFigFileName);
+saveas(f25,iPProfFigFilePath,'jpg');

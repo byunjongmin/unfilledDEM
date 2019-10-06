@@ -77,7 +77,7 @@ DEM = double(DEM); % for integer based DEM
 
 % Draw DEM
 figure(1); clf;
-imagesc(DEM);
+imagesc(rawDEM);
 set(gca,'DataAspectRatio',[1 1 1]);
 colorbar;
 title('Digital Elevation Model');
@@ -98,6 +98,8 @@ DEM(nanMask) = inf;
 [~,slopeAllNbr,~,~,~] = CalcSDSFlow(DEM,dX,dY);
 DEM(nanMask) = nan;
 
+rndDEMwithBnd = DEM; % ramdon values added DEM with boundaries
+    
 % Make a map of flat cells
 flatRegMap = ProcessFlat(DEM,~nanMask,slopeAllNbr);
 
